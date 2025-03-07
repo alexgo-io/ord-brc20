@@ -91,6 +91,7 @@ pub(crate) trait PageContent: Display + 'static {
     PageHtml::new(self, server_config)
   }
 
+  #[allow(dead_code)]
   fn preview_image_url(&self) -> Option<Trusted<String>> {
     None
   }

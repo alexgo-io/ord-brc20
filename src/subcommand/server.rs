@@ -108,6 +108,7 @@ struct Search {
 #[folder = "static"]
 struct StaticAssets;
 
+#[allow(dead_code)]
 struct StaticHtml {
   title: &'static str,
   html: &'static str,

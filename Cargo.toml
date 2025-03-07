@@ -1,18 +1,14 @@
 [package]
-name = "ord"
-description = "◉ Ordinal wallet and block explorer"
-version = "0.14.0"
+name = "ord-brc20"
+description = "Ord indexer for BRC20"
+version = "0.14.0-4"
 license = "CC0-1.0"
 edition = "2021"
 autotests = false
-homepage = "https://github.com/ordinals/ord"
-repository = "https://github.com/ordinals/ord"
+homepage = "https://github.com/alexgo-io/ord-brc20"
+repository = "https://github.com/alexgo-io/ord-brc20"
 autobins = false
-rust-version = "1.67"
-
-[package.metadata.deb]
-copyright = "The Ord Maintainers"
-maintainer = "The Ord Maintainers"
+rust-version = "1.85"
 
 [workspace]
 members = [".", "test-bitcoincore-rpc", "crates/*"]
@@ -63,8 +59,13 @@ sysinfo = "0.30.3"
 tempfile = "3.2.0"
 tokio = { version = "1.17.0", features = ["rt-multi-thread"] }
 tokio-stream = "0.1.9"
-tokio-util = {version = "0.7.3", features = ["compat"] }
-tower-http = { version = "0.4.0", features = ["compression-br", "compression-gzip", "cors", "set-header"] }
+tokio-util = { version = "0.7.3", features = ["compat"] }
+tower-http = { version = "0.4.0", features = [
+  "compression-br",
+  "compression-gzip",
+  "cors",
+  "set-header",
+] }
 
 [dev-dependencies]
 criterion = "0.5.1"
