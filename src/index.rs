@@ -20,9 +20,10 @@ use {
   log::log_enabled,
   ord_bitcoincore_rpc as bitcoincore_rpc,
   redb::{
-    Database, DatabaseError, MultimapTable, MultimapTableDefinition, MultimapTableHandle,
-    ReadOnlyTable, ReadableMultimapTable, ReadableTable, RedbKey, RedbValue, RepairSession,
-    StorageError, Table, TableDefinition, TableHandle, WriteTransaction,
+    Database, DatabaseError, Key as RedbKey, MultimapTable, MultimapTableDefinition,
+    MultimapTableHandle, ReadOnlyTable, ReadableMultimapTable, ReadableTable,
+    ReadableTableMetadata, RepairSession, StorageError, Table, TableDefinition, TableHandle,
+    Value as RedbValue, WriteTransaction,
   },
   std::{
     collections::{BTreeSet, HashMap},
@@ -1989,6 +1990,8 @@ impl Index {
     satpoint: SatPoint,
     sat: Option<u64>,
   ) {
+    use redb::ReadableTableMetadata;
+
     let rtx = self.database.begin_read().unwrap();
 
     let satpoint_to_sequence_number = rtx
