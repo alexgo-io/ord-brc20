@@ -1,4 +1,4 @@
-use {super::*, bitcoincore_rpc::Auth};
+use {super::*, bitcoincore_rpc::Auth, ord_bitcoincore_rpc as bitcoincore_rpc};
 
 #[derive(Clone, Default, Debug, Parser)]
 #[command(group(

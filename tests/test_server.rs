@@ -2,6 +2,7 @@ use {
   super::*,
   crate::command_builder::ToArgs,
   bitcoincore_rpc::{Auth, Client, RpcApi},
+  ord_bitcoincore_rpc as bitcoincore_rpc,
   reqwest::blocking::Response,
 };
 

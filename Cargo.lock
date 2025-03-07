@@ -2334,6 +2334,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ord-bitcoincore-rpc"
+version = "0.17.2"
+source = "git+https://github.com/alexgo-io/ord-bitcoincore-rpc.git?rev=395cb9e1044b3696cefc0e3d96bd0187ed108e45#395cb9e1044b3696cefc0e3d96bd0187ed108e45"
+dependencies = [
+ "bitcoin-private",
+ "jsonrpc",
+ "log",
+ "ord-bitcoincore-rpc-json",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ord-bitcoincore-rpc-json"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2381,7 +2394,7 @@ dependencies = [
  "mime_guess",
  "miniscript",
  "mp4",
- "ord-bitcoincore-rpc",
+ "ord-bitcoincore-rpc 0.17.2 (git+https://github.com/alexgo-io/ord-bitcoincore-rpc.git?rev=395cb9e1044b3696cefc0e3d96bd0187ed108e45)",
  "pretty_assertions",
  "pulldown-cmark",
  "redb",
@@ -3390,7 +3403,7 @@ dependencies = [
  "jsonrpc-core",
  "jsonrpc-derive",
  "jsonrpc-http-server",
- "ord-bitcoincore-rpc",
+ "ord-bitcoincore-rpc 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest",
  "serde",
  "serde_json",

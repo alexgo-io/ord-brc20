@@ -44,7 +44,6 @@ mime = "0.3.17"
 mime_guess = "2.0.5"
 miniscript = "10.2.0"
 mp4 = "0.14.0"
-ord-bitcoincore-rpc = "0.17.2"
 redb = "1.4.0"
 regex = "1.11.1"
 ring = "=0.17.12"
@@ -67,6 +66,11 @@ tower-http = { version = "0.4.0", features = [
   "cors",
   "set-header",
 ] }
+
+[dependencies.ord-bitcoincore-rpc]
+package = "ord-bitcoincore-rpc"
+git = "https://github.com/alexgo-io/ord-bitcoincore-rpc.git"
+rev = "395cb9e1044b3696cefc0e3d96bd0187ed108e45"
 
 [dev-dependencies]
 criterion = "0.5.1"

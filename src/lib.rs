@@ -55,6 +55,7 @@ use {
   derive_more::{Display, FromStr},
   html_escaper::{Escape, Trusted},
   lazy_static::lazy_static,
+  ord_bitcoincore_rpc as bitcoincore_rpc,
   regex::Regex,
   serde::{Deserialize, Deserializer, Serialize, Serializer},
   std::{
