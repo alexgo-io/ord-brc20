@@ -2,9 +2,7 @@ use super::*;
 
 pub mod decode;
 pub mod epochs;
-pub mod find;
 pub mod index;
-pub mod list;
 pub mod parse;
 pub mod subsidy;
 pub mod supply;
@@ -20,12 +18,8 @@ pub(crate) enum Subcommand {
   Decode(decode::Decode),
   #[command(about = "List the first satoshis of each reward epoch")]
   Epochs,
-  #[command(about = "Find a satoshi's current location")]
-  Find(find::Find),
   #[command(subcommand, about = "Index commands")]
   Index(index::IndexSubcommand),
-  #[command(about = "List the satoshis in an output")]
-  List(list::List),
   #[command(about = "Parse a satoshi from ordinal notation")]
   Parse(parse::Parse),
   #[command(about = "Display information about a block's subsidy")]
@@ -53,9 +47,7 @@ impl Subcommand {
     match self {
       Self::Decode(decode) => decode.run(options),
       Self::Epochs => epochs::run(),
-      Self::Find(find) => find.run(options),
       Self::Index(index) => index.run(options),
-      Self::List(list) => list.run(options),
       Self::Parse(parse) => parse.run(),
       Self::Subsidy(subsidy) => subsidy.run(),
       Self::Supply => supply::run(),

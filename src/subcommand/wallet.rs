@@ -23,7 +23,6 @@ pub mod inscriptions;
 pub mod outputs;
 pub mod receive;
 mod restore;
-pub mod sats;
 pub mod send;
 pub mod transaction_builder;
 pub mod transactions;
@@ -52,8 +51,6 @@ pub(crate) enum Subcommand {
   Receive,
   #[command(about = "Restore wallet")]
   Restore(restore::Restore),
-  #[command(about = "List wallet satoshis")]
-  Sats(sats::Sats),
   #[command(about = "Send sat or inscription")]
   Send(send::Send),
   #[command(about = "See wallet transactions")]
@@ -74,7 +71,6 @@ impl Wallet {
       Subcommand::Inscriptions => inscriptions::run(self.name, options),
       Subcommand::Receive => receive::run(self.name, options),
       Subcommand::Restore(restore) => restore.run(self.name, options),
-      Subcommand::Sats(sats) => sats.run(self.name, options),
       Subcommand::Send(send) => send.run(self.name, options),
       Subcommand::Transactions(transactions) => transactions.run(self.name, options),
       Subcommand::Outputs => outputs::run(self.name, options),
@@ -116,20 +112,6 @@ pub(crate) fn get_unspent_outputs(
   index.check_sync(&utxos)?;
 
   Ok(utxos)
-}
-
-pub(crate) fn get_unspent_output_ranges(
-  client: &Client,
-  index: &Index,
-) -> Result<Vec<(OutPoint, Vec<(u64, u64)>)>> {
-  get_unspent_outputs(client, index)?
-    .into_keys()
-    .map(|outpoint| match index.list(outpoint)? {
-      Some(List::Unspent(sat_ranges)) => Ok((outpoint, sat_ranges)),
-      Some(List::Spent) => bail!("output {outpoint} in wallet but is spent according to index"),
-      None => bail!("index has not seen {outpoint}"),
-    })
-    .collect()
 }
 
 pub(crate) fn get_locked_outputs(client: &Client) -> Result<BTreeSet<OutPoint>> {

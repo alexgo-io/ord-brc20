@@ -25,6 +25,7 @@ impl Sat {
     Epoch::from(self).0 / CYCLE_EPOCHS
   }
 
+  #[cfg(test)]
   pub(crate) fn nineball(self) -> bool {
     self.n() >= 50 * COIN_VALUE * 9 && self.n() < 50 * COIN_VALUE * 10
   }
@@ -67,6 +68,7 @@ impl Sat {
     (self.0 - epoch.starting_sat().0) % epoch.subsidy() != 0
   }
 
+  #[cfg(test)]
   pub(crate) fn coin(self) -> bool {
     self.n() % COIN_VALUE == 0
   }

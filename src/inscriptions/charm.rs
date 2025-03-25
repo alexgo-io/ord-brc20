@@ -1,4 +1,5 @@
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 pub(crate) enum Charm {
   Coin,
   Cursed,

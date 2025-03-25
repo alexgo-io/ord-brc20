@@ -47,8 +47,6 @@ pub struct Options {
     help = "Track location of runes. RUNES ARE IN AN UNFINISHED PRE-ALPHA STATE AND SUBJECT TO CHANGE AT ANY TIME."
   )]
   pub(crate) index_runes: bool,
-  #[arg(long, help = "Track location of all satoshis.")]
-  pub(crate) index_sats: bool,
   #[arg(long, help = "Store transactions in index.")]
   pub(crate) index_transactions: bool,
   #[arg(

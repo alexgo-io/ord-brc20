@@ -2,13 +2,12 @@ use {
   self::{
     entry::{
       Entry, HeaderValue, InscriptionEntry, InscriptionEntryValue, InscriptionIdValue,
-      OutPointValue, RuneEntryValue, RuneIdValue, SatPointValue, SatRange, TxidValue,
+      OutPointValue, RuneEntryValue, RuneIdValue, SatPointValue, TxidValue,
     },
     reorg::*,
     updater::Updater,
   },
   super::*,
-  crate::subcommand::find::FindRangeOutput,
   bitcoin::block::Header,
   bitcoincore_rpc::Client,
   indicatif::{ProgressBar, ProgressStyle},
@@ -65,6 +64,7 @@ define_table! { INSCRIPTION_ID_TO_SEQUENCE_NUMBER, InscriptionIdValue, u32 }
 define_table! { INSCRIPTION_NUMBER_TO_SEQUENCE_NUMBER, i32, u32 }
 define_table! { INSCRIPTION_ID_TO_TXCNT, InscriptionIdValue, i64 }
 define_table! { OUTPOINT_TO_RUNE_BALANCES, &OutPointValue, &[u8] }
+#[cfg(test)]
 define_table! { OUTPOINT_TO_SAT_RANGES, &OutPointValue, &[u8] }
 define_table! { OUTPOINT_TO_VALUE, &OutPointValue, u64}
 define_table! { RUNE_ID_TO_RUNE_ENTRY, RuneIdValue, RuneEntryValue }
@@ -78,6 +78,7 @@ define_table! { TRANSACTION_ID_TO_RUNE, &TxidValue, u128 }
 define_table! { TRANSACTION_ID_TO_TRANSACTION, &TxidValue, &[u8] }
 define_table! { WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP, u32, u128 }
 
+#[cfg(test)]
 #[derive(Debug, PartialEq)]
 pub enum List {
   Spent,
@@ -85,6 +86,7 @@ pub enum List {
 }
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 pub(crate) enum Statistic {
   Schema = 0,
   BlessedInscriptions,
@@ -145,7 +147,6 @@ pub struct Index {
   genesis_block_coinbase_txid: Txid,
   height_limit: Option<u32>,
   index_runes: bool,
-  index_sats: bool,
   index_transactions: bool,
   options: Options,
   unrecoverably_reorged: AtomicBool,
@@ -185,7 +186,6 @@ impl Index {
     };
 
     let index_runes;
-    let index_sats;
     let index_transactions;
 
     let index_path = path.clone();
@@ -241,7 +241,6 @@ impl Index {
 
 
           index_runes = Self::is_statistic_set(&statistics, Statistic::IndexRunes)?;
-          index_sats = Self::is_statistic_set(&statistics, Statistic::IndexSats)?;
           index_transactions = Self::is_statistic_set(&statistics, Statistic::IndexTransactions)?;
         }
 
@@ -279,19 +278,12 @@ impl Index {
         tx.open_table(WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP)?;
 
         {
-          let mut outpoint_to_sat_ranges = tx.open_table(OUTPOINT_TO_SAT_RANGES)?;
           let mut statistics = tx.open_table(STATISTIC_TO_COUNT)?;
 
-          if options.index_sats {
-            outpoint_to_sat_ranges.insert(&OutPoint::null().store(), [].as_slice())?;
-          }
-
           index_runes = options.index_runes();
-          index_sats = options.index_sats;
           index_transactions = options.index_transactions;
 
           Self::set_statistic(&mut statistics, Statistic::IndexRunes, u64::from(index_runes))?;
-          Self::set_statistic(&mut statistics, Statistic::IndexSats, u64::from(index_sats))?;
           Self::set_statistic(&mut statistics, Statistic::IndexTransactions, u64::from(index_transactions))?;
           Self::set_statistic(&mut statistics, Statistic::Schema, SCHEMA_VERSION)?;
         }
@@ -307,8 +299,8 @@ impl Index {
       options.chain().genesis_block().coinbase().unwrap().clone();
 
     println!(
-      "Open index: runes: {}, sats: {}, transactions: {}",
-      index_runes, index_sats, index_transactions
+      "Open index: runes: {}, transactions: {}",
+      index_runes, index_transactions
     );
     Ok(Self {
       genesis_block_coinbase_txid: genesis_block_coinbase_transaction.txid(),
@@ -319,7 +311,6 @@ impl Index {
       genesis_block_coinbase_transaction,
       height_limit: options.height_limit,
       index_runes,
-      index_sats,
       index_transactions,
       options: options.clone(),
       unrecoverably_reorged: AtomicBool::new(false),
@@ -347,10 +338,6 @@ impl Index {
 
   pub(crate) fn has_rune_index(&self) -> bool {
     self.index_runes
-  }
-
-  pub(crate) fn has_sat_index(&self) -> bool {
-    self.index_sats
   }
 
   pub(crate) fn update(&self) -> Result {
@@ -788,17 +775,7 @@ impl Index {
     self.client.get_raw_transaction(&txid, None).into_option()
   }
 
-  pub(crate) fn is_transaction_in_active_chain(&self, txid: Txid) -> Result<bool> {
-    Ok(
-      self
-        .client
-        .get_raw_transaction_info(&txid, None)
-        .into_option()?
-        .and_then(|info| info.in_active_chain)
-        .unwrap_or(false),
-    )
-  }
-
+  #[cfg(test)]
   pub(crate) fn find(&self, sat: Sat) -> Result<Option<SatPoint>> {
     let sat = sat.0;
     let rtx = self.begin_read()?;
@@ -813,7 +790,7 @@ impl Index {
       let (key, value) = range?;
       let mut offset = 0;
       for chunk in value.value().chunks_exact(11) {
-        let (start, end) = SatRange::load(chunk.try_into().unwrap());
+        let (start, end) = entry::SatRange::load(chunk.try_into().unwrap());
         if start <= sat && sat < end {
           return Ok(Some(SatPoint {
             outpoint: Entry::load(*key.value()),
@@ -827,94 +804,9 @@ impl Index {
     Ok(None)
   }
 
-  pub(crate) fn find_range(
-    &self,
-    range_start: Sat,
-    range_end: Sat,
-  ) -> Result<Option<Vec<FindRangeOutput>>> {
-    let range_start = range_start.0;
-    let range_end = range_end.0;
-    let rtx = self.begin_read()?;
-
-    if rtx.block_count()? < Sat(range_end - 1).height().n() + 1 {
-      return Ok(None);
-    }
-
-    let Some(mut remaining_sats) = range_end.checked_sub(range_start) else {
-      return Err(anyhow!("range end is before range start"));
-    };
-
-    let outpoint_to_sat_ranges = rtx.0.open_table(OUTPOINT_TO_SAT_RANGES)?;
-
-    let mut result = Vec::new();
-    for range in outpoint_to_sat_ranges.range::<&[u8; 36]>(&[0; 36]..)? {
-      let (outpoint_entry, sat_ranges_entry) = range?;
-
-      let mut offset = 0;
-      for sat_range in sat_ranges_entry.value().chunks_exact(11) {
-        let (start, end) = SatRange::load(sat_range.try_into().unwrap());
-
-        if end > range_start && start < range_end {
-          let overlap_start = start.max(range_start);
-          let overlap_end = end.min(range_end);
-
-          result.push(FindRangeOutput {
-            start: overlap_start,
-            size: overlap_end - overlap_start,
-            satpoint: SatPoint {
-              outpoint: Entry::load(*outpoint_entry.value()),
-              offset: offset + overlap_start - start,
-            },
-          });
-
-          remaining_sats -= overlap_end - overlap_start;
-
-          if remaining_sats == 0 {
-            break;
-          }
-        }
-        offset += end - start;
-      }
-    }
-
-    Ok(Some(result))
-  }
-
-  fn list_inner(&self, outpoint: OutPointValue) -> Result<Option<Vec<u8>>> {
-    Ok(
-      self
-        .database
-        .begin_read()?
-        .open_table(OUTPOINT_TO_SAT_RANGES)?
-        .get(&outpoint)?
-        .map(|outpoint| outpoint.value().to_vec()),
-    )
-  }
-
-  pub(crate) fn list(&self, outpoint: OutPoint) -> Result<Option<List>> {
-    if !self.index_sats || outpoint == unbound_outpoint() {
-      return Ok(None);
-    }
-
-    let array = outpoint.store();
-
-    let sat_ranges = self.list_inner(array)?;
-
-    match sat_ranges {
-      Some(sat_ranges) => Ok(Some(List::Unspent(
-        sat_ranges
-          .chunks_exact(11)
-          .map(|chunk| SatRange::load(chunk.try_into().unwrap()))
-          .collect(),
-      ))),
-      None => {
-        if self.is_transaction_in_active_chain(outpoint.txid)? {
-          Ok(Some(List::Spent))
-        } else {
-          Ok(None)
-        }
-      }
-    }
+  #[cfg(test)]
+  pub(crate) fn list(&self, _outpoint: OutPoint) -> Result<Option<List>> {
+    Ok(None)
   }
 
   pub(crate) fn get_inscriptions(
@@ -995,7 +887,7 @@ impl Index {
     &self,
     inscription_id: InscriptionId,
     satpoint: SatPoint,
-    sat: Option<u64>,
+    _: Option<u64>,
   ) {
     use redb::ReadableTableMetadata;
 
@@ -1035,43 +927,6 @@ impl Index {
       .get(&satpoint.store())
       .unwrap()
       .any(|result| result.unwrap().value() == sequence_number));
-
-    match sat {
-      Some(sat) => {
-        if self.index_sats {
-          // unbound inscriptions should not be assigned to a sat
-          assert!(satpoint.outpoint != unbound_outpoint());
-
-          assert!(rtx
-            .open_multimap_table(SAT_TO_SEQUENCE_NUMBER)
-            .unwrap()
-            .get(&sat)
-            .unwrap()
-            .any(|entry| entry.unwrap().value() == sequence_number));
-
-          // we do not track common sats (only the sat ranges)
-          if !Sat(sat).common() {
-            assert_eq!(
-              SatPoint::load(
-                *rtx
-                  .open_table(SAT_TO_SATPOINT)
-                  .unwrap()
-                  .get(&sat)
-                  .unwrap()
-                  .unwrap()
-                  .value()
-              ),
-              satpoint,
-            );
-          }
-        }
-      }
-      None => {
-        if self.index_sats {
-          assert!(satpoint.outpoint == unbound_outpoint())
-        }
-      }
-    }
   }
 
   fn inscriptions_on_output<'a: 'tx, 'tx>(

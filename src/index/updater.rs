@@ -49,7 +49,6 @@ pub(crate) struct Updater<'index> {
   index: &'index Index,
   sat_ranges_since_flush: u64,
   outputs_cached: u64,
-  outputs_inserted_since_flush: u64,
   outputs_traversed: u64,
 }
 
@@ -61,7 +60,6 @@ impl<'index> Updater<'_> {
       index,
       sat_ranges_since_flush: 0,
       outputs_cached: 0,
-      outputs_inserted_since_flush: 0,
       outputs_traversed: 0,
     })
   }
@@ -95,7 +93,7 @@ impl<'index> Updater<'_> {
       Some(progress_bar)
     };
 
-    let rx = Self::fetch_blocks_from(self.index, self.height, self.index.index_sats)?;
+    let rx = Self::fetch_blocks_from(self.index, self.height)?;
 
     let (mut outpoint_sender, mut value_receiver) = Self::spawn_fetcher(self.index)?;
 
@@ -169,11 +167,7 @@ impl<'index> Updater<'_> {
     Ok(())
   }
 
-  fn fetch_blocks_from(
-    index: &Index,
-    mut height: u32,
-    index_sats: bool,
-  ) -> Result<mpsc::Receiver<BlockData>> {
+  fn fetch_blocks_from(index: &Index, mut height: u32) -> Result<mpsc::Receiver<BlockData>> {
     let (tx, rx) = mpsc::sync_channel(32);
 
     let height_limit = index.height_limit;
@@ -189,7 +183,7 @@ impl<'index> Updater<'_> {
         }
       }
 
-      match Self::get_block_with_retries(&client, height, index_sats, first_inscription_height) {
+      match Self::get_block_with_retries(&client, height, first_inscription_height) {
         Ok(Some(block)) => {
           if let Err(err) = tx.send(block.into()) {
             log::info!("Block receiver disconnected: {err}");
@@ -211,7 +205,6 @@ impl<'index> Updater<'_> {
   fn get_block_with_retries(
     client: &Client,
     height: u32,
-    index_sats: bool,
     first_inscription_height: u32,
   ) -> Result<Option<Block>> {
     let mut errors = 0;
@@ -222,7 +215,7 @@ impl<'index> Updater<'_> {
         .and_then(|option| {
           option
             .map(|hash| {
-              if index_sats || height >= first_inscription_height {
+              if height >= first_inscription_height {
                 Ok(client.get_block(&hash)?)
               } else {
                 Ok(Block {
@@ -429,7 +422,6 @@ impl<'index> Updater<'_> {
     let mut inscription_number_to_sequence_number =
       wtx.open_table(INSCRIPTION_NUMBER_TO_SEQUENCE_NUMBER)?;
     let mut inscription_id_to_txcnt = wtx.open_table(INSCRIPTION_ID_TO_TXCNT)?;
-    let mut sat_to_sequence_number = wtx.open_multimap_table(SAT_TO_SEQUENCE_NUMBER)?;
     let mut satpoint_to_sequence_number = wtx.open_multimap_table(SATPOINT_TO_SEQUENCE_NUMBER)?;
     let mut sequence_number_to_children = wtx.open_multimap_table(SEQUENCE_NUMBER_TO_CHILDREN)?;
     let mut sequence_number_to_inscription_entry =
@@ -483,7 +475,6 @@ impl<'index> Updater<'_> {
       next_sequence_number,
       outpoint_to_value: &mut outpoint_to_value,
       reward: Height(self.height).subsidy(),
-      sat_to_sequence_number: &mut sat_to_sequence_number,
       satpoint_to_sequence_number: &mut satpoint_to_sequence_number,
       sequence_number_to_children: &mut sequence_number_to_children,
       sequence_number_to_entry: &mut sequence_number_to_inscription_entry,
@@ -497,117 +488,16 @@ impl<'index> Updater<'_> {
       first_in_block: true,
     };
 
-    /* if self.index.index_sats {
-      let mut sat_to_satpoint = wtx.open_table(SAT_TO_SATPOINT)?;
-      let mut outpoint_to_sat_ranges = wtx.open_table(OUTPOINT_TO_SAT_RANGES)?;
-
-      let mut coinbase_inputs = VecDeque::new();
-
-      let h = Height(self.height);
-      if h.subsidy() > 0 {
-        let start = h.starting_sat();
-        coinbase_inputs.push_front((start.n(), (start + h.subsidy()).n()));
-        self.sat_ranges_since_flush += 1;
-      }
-
-      for (tx_offset, (tx, txid)) in block.txdata.iter().enumerate().skip(1) {
-        log::trace!("Indexing transaction {tx_offset}…");
-
-        let mut input_sat_ranges = VecDeque::new();
-
-        for input in &tx.input {
-          let key = input.previous_output.store();
-
-          let sat_ranges = match self.range_cache.remove(&key) {
-            Some(sat_ranges) => {
-              self.outputs_cached += 1;
-              sat_ranges
-            }
-            None => outpoint_to_sat_ranges
-              .remove(&key)?
-              .ok_or_else(|| anyhow!("Could not find outpoint {} in index", input.previous_output))?
-              .value()
-              .to_vec(),
-          };
-
-          for chunk in sat_ranges.chunks_exact(11) {
-            input_sat_ranges.push_back(SatRange::load(chunk.try_into().unwrap()));
-          }
-        }
-
-        self.index_transaction_sats(
-          tx,
-          *txid,
-          &mut sat_to_satpoint,
-          &mut input_sat_ranges,
-          &mut sat_ranges_written,
-          &mut outputs_in_block,
-          &mut inscription_updater,
-          index_inscriptions,
-        )?;
-
-        coinbase_inputs.extend(input_sat_ranges);
-      }
-
-      if let Some((tx, txid)) = block.txdata.first() {
-        self.index_transaction_sats(
-          tx,
-          *txid,
-          &mut sat_to_satpoint,
-          &mut coinbase_inputs,
-          &mut sat_ranges_written,
-          &mut outputs_in_block,
-          &mut inscription_updater,
-          index_inscriptions,
-        )?;
-      }
-
-      if !coinbase_inputs.is_empty() {
-        let mut lost_sat_ranges = outpoint_to_sat_ranges
-          .remove(&OutPoint::null().store())?
-          .map(|ranges| ranges.value().to_vec())
-          .unwrap_or_default();
-
-        for (start, end) in coinbase_inputs {
-          if !Sat(start).common() {
-            sat_to_satpoint.insert(
-              &start,
-              &SatPoint {
-                outpoint: OutPoint::null(),
-                offset: lost_sats,
-              }
-              .store(),
-            )?;
-          }
-
-          lost_sat_ranges.extend_from_slice(&(start, end).store());
-
-          lost_sats += end - start;
-        }
-
-        outpoint_to_sat_ranges.insert(&OutPoint::null().store(), lost_sat_ranges.as_slice())?;
-      }
-    } else */
     if index_inscriptions {
       for (tx, txid) in block.txdata.iter().skip(1).chain(block.txdata.first()) {
-        inscription_updater.index_envelopes(tx, *txid, None)?;
+        inscription_updater.index_envelopes(tx, *txid)?;
       }
       inscription_updater.end_block()?;
-    }
-
-    if index_inscriptions {
       height_to_last_sequence_number
         .insert(&self.height, inscription_updater.next_sequence_number)?;
     }
 
-    statistic_to_count.insert(
-      &Statistic::LostSats.key(),
-      &if self.index.index_sats {
-        lost_sats
-      } else {
-        inscription_updater.lost_sats
-      },
-    )?;
+    statistic_to_count.insert(&Statistic::LostSats.key(), &inscription_updater.lost_sats)?;
 
     statistic_to_count.insert(
       &Statistic::CursedInscriptions.key(),
@@ -683,73 +573,7 @@ impl<'index> Updater<'_> {
 
     Ok(())
   }
-  /*
-    fn index_transaction_sats(
-      &mut self,
-      tx: &Transaction,
-      txid: Txid,
-      sat_to_satpoint: &mut Table<u64, &SatPointValue>,
-      input_sat_ranges: &mut VecDeque<(u64, u64)>,
-      sat_ranges_written: &mut u64,
-      outputs_traversed: &mut u64,
-      inscription_updater: &mut InscriptionUpdater,
-      index_inscriptions: bool,
-    ) -> Result {
-      if index_inscriptions {
-        inscription_updater.index_envelopes(tx, txid, Some(input_sat_ranges))?;
-      }
 
-      for (vout, output) in tx.output.iter().enumerate() {
-        let outpoint = OutPoint {
-          vout: vout.try_into().unwrap(),
-          txid,
-        };
-        let mut sats = Vec::new();
-
-        let mut remaining = output.value;
-        while remaining > 0 {
-          let range = input_sat_ranges
-            .pop_front()
-            .ok_or_else(|| anyhow!("insufficient inputs for transaction outputs"))?;
-
-          if !Sat(range.0).common() {
-            sat_to_satpoint.insert(
-              &range.0,
-              &SatPoint {
-                outpoint,
-                offset: output.value - remaining,
-              }
-              .store(),
-            )?;
-          }
-
-          let count = range.1 - range.0;
-
-          let assigned = if count > remaining {
-            self.sat_ranges_since_flush += 1;
-            let middle = range.0 + remaining;
-            input_sat_ranges.push_front((middle, range.1));
-            (range.0, middle)
-          } else {
-            range
-          };
-
-          sats.extend_from_slice(&assigned.store());
-
-          remaining -= assigned.1 - assigned.0;
-
-          *sat_ranges_written += 1;
-        }
-
-        *outputs_traversed += 1;
-
-        self.range_cache.insert(outpoint.store(), sats);
-        self.outputs_inserted_since_flush += 1;
-      }
-
-      Ok(())
-    }
-  */
   fn commit(&mut self, wtx: WriteTransaction, value_cache: HashMap<OutPoint, u64>) -> Result {
     log::info!(
       "Committing at block height {}, {} outputs traversed, {} in map, {} cached",
@@ -758,23 +582,6 @@ impl<'index> Updater<'_> {
       self.range_cache.len(),
       self.outputs_cached
     );
-
-    if self.index.index_sats {
-      log::info!(
-        "Flushing {} entries ({:.1}% resulting from {} insertions) from memory to database",
-        self.range_cache.len(),
-        self.range_cache.len() as f64 / self.outputs_inserted_since_flush as f64 * 100.,
-        self.outputs_inserted_since_flush,
-      );
-
-      let mut outpoint_to_sat_ranges = wtx.open_table(OUTPOINT_TO_SAT_RANGES)?;
-
-      for (outpoint, sat_range) in self.range_cache.drain() {
-        outpoint_to_sat_ranges.insert(&outpoint, sat_range.as_slice())?;
-      }
-
-      self.outputs_inserted_since_flush = 0;
-    }
 
     {
       let mut outpoint_to_value = wtx.open_table(OUTPOINT_TO_VALUE)?;

@@ -9,7 +9,6 @@
   clippy::cast_possible_wrap,
   clippy::cast_sign_loss
 )]
-
 use {
   self::{
     arguments::Arguments,
@@ -20,7 +19,6 @@ use {
     deserialize_from_str::DeserializeFromStr,
     epoch::Epoch,
     height::Height,
-    index::List,
     inscriptions::{teleburn, Charm, ParsedEnvelope},
     outgoing::Outgoing,
     representation::Representation,
@@ -56,7 +54,7 @@ use {
   serde::{Deserialize, Deserializer, Serialize, Serializer},
   std::{
     cmp,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
     fs::{self, File},
@@ -87,6 +85,10 @@ pub use self::{
   sat_point::SatPoint,
   subcommand::wallet::transaction_builder::{Target, TransactionBuilder},
 };
+
+#[cfg(test)]
+#[allow(unused_imports)]
+use self::index::List;
 
 #[cfg(test)]
 #[macro_use]

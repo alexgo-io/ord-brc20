@@ -69,7 +69,6 @@ pub(super) struct InscriptionUpdater<'a, 'tx> {
   pub(super) transaction_buffer: Vec<u8>,
   pub(super) transaction_id_to_transaction:
     &'a mut Table<'tx, &'static TxidValue, &'static [u8]>,
-  pub(super) sat_to_sequence_number: &'a mut MultimapTable<'tx, u64, u32>,
   pub(super) satpoint_to_sequence_number:
     &'a mut MultimapTable<'tx, &'static SatPointValue, u32>,
   pub(super) sequence_number_to_children: &'a mut MultimapTable<'tx, u32, u32>,
@@ -87,7 +86,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
     &mut self,
     tx: &'a Transaction,
     txid: Txid,
-    input_sat_ranges: Option<&VecDeque<(u64, u64)>>,
   ) -> Result {
     let mut floating_inscriptions = Vec::new();
     let mut id_counter = 0;
@@ -403,7 +401,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
         Some(&tx),
         Some(&tx_out.script_pubkey),
         Some(&tx_out.value),
-        input_sat_ranges,
         flotsam,
         new_satpoint,
         sent_to_coinbase,
@@ -417,7 +414,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
           offset: self.lost_sats + flotsam.offset - output_value,
         };
         let tx = flotsam.tx_option.clone().unwrap();
-        self.update_inscription_location(Some(&tx), None, None, input_sat_ranges, flotsam, new_satpoint, true)?;
+        self.update_inscription_location(Some(&tx), None, None, flotsam, new_satpoint, true)?;
       }
       self.lost_sats += self.reward - output_value;
       Ok(())
@@ -434,25 +431,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
       self.reward += total_input_value - output_value;
       Ok(())
     }
-  }
-
-  fn calculate_sat(
-    input_sat_ranges: Option<&VecDeque<(u64, u64)>>,
-    input_offset: u64,
-  ) -> Option<Sat> {
-    let input_sat_ranges = input_sat_ranges?;
-
-    let mut offset = 0;
-    for (start, end) in input_sat_ranges {
-      let size = end - start;
-      if offset + size > input_offset {
-        let n = start + input_offset - offset;
-        return Some(Sat(n));
-      }
-      offset += size;
-    }
-
-    unreachable!()
   }
 
   fn get_json_tx_limit(inscription_content_option: &Option<Vec<u8>>) -> i16 {
@@ -527,7 +505,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
     tx_option: Option<&Transaction>,
     new_script_pubkey: Option<&ScriptBuf>,
     new_output_value: Option<&u64>,
-    input_sat_ranges: Option<&VecDeque<(u64, u64)>>,
     flotsam: Flotsam,
     new_satpoint: SatPoint,
     send_to_coinbase: bool,
@@ -636,12 +613,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
           0
         };
 
-        let sat = if unbound {
-          None
-        } else {
-          Self::calculate_sat(input_sat_ranges, flotsam.offset)
-        };
-
         let mut charms = 0;
 
         if cursed {
@@ -652,34 +623,12 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
           Charm::Reinscription.set(&mut charms);
         }
 
-        if let Some(sat) = sat {
-          if sat.nineball() {
-            Charm::Nineball.set(&mut charms);
-          }
-
-          if sat.coin() {
-            Charm::Coin.set(&mut charms);
-          }
-
-          match sat.rarity() {
-            Rarity::Common | Rarity::Mythic => {}
-            Rarity::Uncommon => Charm::Uncommon.set(&mut charms),
-            Rarity::Rare => Charm::Rare.set(&mut charms),
-            Rarity::Epic => Charm::Epic.set(&mut charms),
-            Rarity::Legendary => Charm::Legendary.set(&mut charms),
-          }
-        }
-
         if new_satpoint.outpoint == OutPoint::null() {
           Charm::Lost.set(&mut charms);
         }
 
         if unbound {
           Charm::Unbound.set(&mut charms);
-        }
-
-        if let Some(Sat(n)) = sat {
-          self.sat_to_sequence_number.insert(&n, &sequence_number)?;
         }
 
         let parent = match parent {
@@ -707,7 +656,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
             id: inscription_id,
             inscription_number,
             parent,
-            sat,
+            sat: None,
             sequence_number,
             timestamp: self.timestamp,
             is_json_or_text,
