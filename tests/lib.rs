@@ -8,15 +8,7 @@ use {
     Network, OutPoint, Txid,
   },
   executable_path::executable_path,
-  ord::{
-    rarity::Rarity,
-    subcommand::runes::RuneInfo,
-    templates::{
-      block::BlockJson, inscription::InscriptionJson, inscriptions::InscriptionsJson,
-      output::OutputJson, sat::SatJson,
-    },
-    Edict, InscriptionId, Rune, RuneId, Runestone, SatPoint,
-  },
+  ord::{subcommand::runes::RuneInfo, InscriptionId, Rune, RuneId, SatPoint},
   pretty_assertions::assert_eq as pretty_assert_eq,
   regex::Regex,
   reqwest::{StatusCode, Url},
@@ -33,7 +25,7 @@ use {
     time::Duration,
   },
   tempfile::TempDir,
-  test_bitcoincore_rpc::{Sent, TransactionTemplate},
+  test_bitcoincore_rpc::Sent,
 };
 
 macro_rules! assert_regex_match {
@@ -59,24 +51,6 @@ fn create_wallet(rpc_server: &test_bitcoincore_rpc::Handle) {
   CommandBuilder::new(format!("--chain {} wallet create", rpc_server.network()))
     .rpc_server(rpc_server)
     .run_and_deserialize_output::<ord::subcommand::wallet::create::Output>();
-}
-
-fn envelope(payload: &[&[u8]]) -> bitcoin::Witness {
-  let mut builder = bitcoin::script::Builder::new()
-    .push_opcode(bitcoin::opcodes::OP_FALSE)
-    .push_opcode(bitcoin::opcodes::all::OP_IF);
-
-  for data in payload {
-    let mut buf = bitcoin::script::PushBytesBuf::new();
-    buf.extend_from_slice(data).unwrap();
-    builder = builder.push_slice(buf);
-  }
-
-  let script = builder
-    .push_opcode(bitcoin::opcodes::all::OP_ENDIF)
-    .into_script();
-
-  bitcoin::Witness::from_slice(&[script.into_bytes(), Vec::new()])
 }
 
 fn etch(rpc_server: &test_bitcoincore_rpc::Handle, rune: Rune) -> Etch {
@@ -122,15 +96,12 @@ mod command_builder;
 mod expected;
 mod test_server;
 
-mod balances;
 mod core;
 mod decode;
 mod epochs;
 mod etch;
 mod find;
 mod index;
-mod info;
-mod json_api;
 mod list;
 mod parse;
 mod runes;

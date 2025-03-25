@@ -3,6 +3,7 @@ use super::*;
 pub(crate) struct Rtx(pub(crate) redb::ReadTransaction);
 
 impl Rtx {
+  #[cfg(test)]
   pub(crate) fn block_height(&self) -> Result<Option<Height>> {
     Ok(
       self

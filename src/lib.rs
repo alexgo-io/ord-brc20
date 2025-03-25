@@ -13,7 +13,6 @@
 use {
   self::{
     arguments::Arguments,
-    blocktime::Blocktime,
     config::Config,
     decimal::Decimal,
     decimal_sat::DecimalSat,
@@ -22,12 +21,11 @@ use {
     epoch::Epoch,
     height::Height,
     index::{List, RuneEntry},
-    inscriptions::{media, teleburn, Charm, Media, ParsedEnvelope},
+    inscriptions::{teleburn, Charm, ParsedEnvelope},
     outgoing::Outgoing,
     representation::Representation,
     runes::{Etching, Pile, SpacedRune},
     subcommand::{Subcommand, SubcommandResult},
-    tally::Tally,
   },
   anyhow::{anyhow, bail, ensure, Context, Error},
   bip39::Mnemonic,
@@ -42,8 +40,7 @@ use {
     consensus::{self, Decodable, Encodable},
     hash_types::BlockHash,
     hashes::Hash,
-    opcodes,
-    script::{self, Instruction},
+    script::{self},
     Amount, Block, Network, OutPoint, Script, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
   },
@@ -53,7 +50,6 @@ use {
   ciborium::Value,
   clap::{ArgGroup, Parser},
   derive_more::{Display, FromStr},
-  html_escaper::{Escape, Trusted},
   lazy_static::lazy_static,
   ord_bitcoincore_rpc as bitcoincore_rpc,
   regex::Regex,
@@ -62,26 +58,21 @@ use {
     cmp,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     env,
-    ffi::OsString,
     fmt::{self, Display, Formatter},
     fs::{self, File},
     io::{self, Cursor},
     mem,
-    net::{TcpListener, ToSocketAddrs},
     ops::{Add, AddAssign, Sub},
     path::{Path, PathBuf},
-    process::{self, Command},
+    process::{self},
     str::FromStr,
     sync::{
       atomic::{self, AtomicBool},
-      Arc, Mutex,
+      Mutex,
     },
     thread,
     time::{Duration, Instant, SystemTime},
   },
-  sysinfo::System,
-  tempfile::TempDir,
-  tokio::{runtime::Runtime, task},
 };
 
 pub use self::{
@@ -115,7 +106,6 @@ macro_rules! tprintln {
 }
 
 mod arguments;
-mod blocktime;
 mod chain;
 mod config;
 mod decimal;
@@ -135,17 +125,14 @@ mod representation;
 pub mod runes;
 pub mod sat;
 mod sat_point;
-mod server_config;
 pub mod subcommand;
 mod tally;
-pub mod templates;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 const CYCLE_EPOCHS: u32 = 6;
 
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
-static LISTENERS: Mutex<Vec<axum_server::Handle>> = Mutex::new(Vec::new());
 static INDEXER: Mutex<Option<thread::JoinHandle<()>>> = Mutex::new(Option::None);
 
 const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
@@ -222,12 +209,6 @@ pub fn main() {
     }
 
     println!("Shutting down gracefully. Press <CTRL-C> again to shutdown immediately.");
-
-    LISTENERS
-      .lock()
-      .unwrap()
-      .iter()
-      .for_each(|handle| handle.graceful_shutdown(Some(Duration::from_millis(100))));
   })
   .expect("Error setting <CTRL-C> handler");
 

@@ -276,6 +276,7 @@ mod tests {
     self::batch::BatchEntry,
     super::*,
     serde_yaml::{Mapping, Value},
+    tempfile::TempDir,
   };
 
   #[test]

@@ -10,7 +10,7 @@ use {
   },
   brotli::enc::{writer::CompressorWriter, BrotliEncoderParams},
   http::header::HeaderValue,
-  io::{Cursor, Read, Write},
+  io::{Read, Write},
   std::str,
 };
 
@@ -220,14 +220,6 @@ impl Inscription {
     Some(self.body.as_ref()?)
   }
 
-  pub(crate) fn into_body(self) -> Option<Vec<u8>> {
-    self.body
-  }
-
-  pub(crate) fn content_length(&self) -> Option<usize> {
-    Some(self.body()?.len())
-  }
-
   pub(crate) fn content_type(&self) -> Option<&str> {
     str::from_utf8(self.content_type.as_ref()?).ok()
   }
@@ -236,10 +228,12 @@ impl Inscription {
     HeaderValue::from_str(str::from_utf8(self.content_encoding.as_ref()?).unwrap_or_default()).ok()
   }
 
+  #[cfg(test)]
   pub(crate) fn delegate(&self) -> Option<InscriptionId> {
     Self::inscription_id_field(&self.delegate)
   }
 
+  #[cfg(test)]
   pub(crate) fn metadata(&self) -> Option<Value> {
     ciborium::from_reader(Cursor::new(self.metadata.as_ref()?)).ok()
   }

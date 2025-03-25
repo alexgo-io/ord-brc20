@@ -1,3 +1,5 @@
+use bitcoin::{opcodes, script::Instruction};
+
 use super::*;
 
 const TAG_BODY: u128 = 0;

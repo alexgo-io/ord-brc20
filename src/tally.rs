@@ -1,20 +1,25 @@
-use super::*;
+#[cfg(test)]
+use std::fmt::{self, Display, Formatter};
 
+#[cfg(test)]
 pub(crate) trait Tally {
   fn tally(self, count: usize) -> Tallied;
 }
 
+#[cfg(test)]
 impl Tally for &'static str {
   fn tally(self, count: usize) -> Tallied {
     Tallied { noun: self, count }
   }
 }
 
+#[cfg(test)]
 pub(crate) struct Tallied {
   count: usize,
   noun: &'static str,
 }
 
+#[cfg(test)]
 impl Display for Tallied {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     if self.count == 1 {

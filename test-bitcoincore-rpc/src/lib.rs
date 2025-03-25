@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
+use ord_bitcoincore_rpc as bitcoincore_rpc;
 use {
   api::Api,
   bitcoin::{

@@ -8,13 +8,17 @@ homepage = "https://github.com/ordinals/ord"
 repository = "https://github.com/ordinals/ord"
 
 [dependencies]
-bitcoin = { version = "0.30.0", features = ["serde", "rand"] }
+bitcoin = { version = "0.30.2", features = ["serde", "rand"] }
 hex = "0.4.3"
 jsonrpc-core = "18.0.0"
 jsonrpc-derive = "18.0.0"
 jsonrpc-http-server = "18.0.0"
-ord-bitcoincore-rpc = "0.17.1"
-reqwest = { version = "0.11.10", features = ["blocking"] }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = { version = "1.0.81" }
-tempfile = "3.2.0"
+reqwest = { version = "0.12.15", features = ["blocking"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { version = "1.0.140" }
+tempfile = "3.19.1"
+
+[dependencies.ord-bitcoincore-rpc]
+package = "ord-bitcoincore-rpc"
+git = "https://github.com/alexgo-io/ord-bitcoincore-rpc.git"
+rev = "395cb9e1044b3696cefc0e3d96bd0187ed108e45"

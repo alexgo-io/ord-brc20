@@ -7,7 +7,6 @@ pub(crate) use {
   pretty_assertions::assert_eq as pretty_assert_eq,
   std::iter,
   test_bitcoincore_rpc::TransactionTemplate,
-  unindent::Unindent,
 };
 
 macro_rules! assert_regex_match {
@@ -37,16 +36,6 @@ macro_rules! assert_matches {
   }
 }
 
-pub(crate) fn blockhash(n: u64) -> BlockHash {
-  let hex = format!("{n:x}");
-
-  if hex.is_empty() || hex.len() > 1 {
-    panic!();
-  }
-
-  hex.repeat(64).parse().unwrap()
-}
-
 pub(crate) fn txid(n: u64) -> Txid {
   let hex = format!("{n:x}");
 
@@ -66,13 +55,6 @@ pub(crate) fn satpoint(n: u64, offset: u64) -> SatPoint {
     outpoint: outpoint(n),
     offset,
   }
-}
-
-pub(crate) fn address() -> Address {
-  "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
-    .parse::<Address<NetworkUnchecked>>()
-    .unwrap()
-    .assume_checked()
 }
 
 pub(crate) fn recipient() -> Address {

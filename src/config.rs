@@ -9,6 +9,7 @@ pub(crate) struct Config {
 }
 
 impl Config {
+  #[cfg(test)]
   pub(crate) fn is_hidden(&self, inscription_id: InscriptionId) -> bool {
     self.hidden.contains(&inscription_id)
   }

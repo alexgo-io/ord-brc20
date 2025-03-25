@@ -29,6 +29,7 @@ impl Sat {
     self.n() >= 50 * COIN_VALUE * 9 && self.n() < 50 * COIN_VALUE * 10
   }
 
+  #[cfg(test)]
   pub(crate) fn percentile(self) -> String {
     format!("{}%", (self.0 as f64 / Self::LAST.0 as f64) * 100.0)
   }

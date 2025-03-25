@@ -86,18 +86,6 @@ impl TestServer {
     reqwest::blocking::get(self.url().join(path.as_ref()).unwrap()).unwrap()
   }
 
-  pub(crate) fn json_request(&self, path: impl AsRef<str>) -> Response {
-    self.sync_server();
-
-    let client = reqwest::blocking::Client::new();
-
-    client
-      .get(self.url().join(path.as_ref()).unwrap())
-      .header(reqwest::header::ACCEPT, "application/json")
-      .send()
-      .unwrap()
-  }
-
   pub(crate) fn sync_server(&self) {
     let client = Client::new(&self.rpc_url, Auth::None).unwrap();
     let chain_block_count = client.get_block_count().unwrap() + 1;

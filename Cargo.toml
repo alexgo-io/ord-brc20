@@ -11,37 +11,29 @@ autobins = false
 rust-version = "1.85"
 
 [workspace]
-members = ["."]
+members = [".", "test-bitcoincore-rpc"]
 
 [dependencies]
 anyhow = { version = "1.0.97", features = ["backtrace"] }
-async-trait = "0.1.87"
-axum = { version = "0.6.1", features = ["headers", "http2"] }
-axum-server = "0.5.1"
+async-trait = "0.1.88"
 base64 = "0.22.1"
-bech32 = "0.11.0"
 bip39 = "2.1.0"
 bitcoin = { version = "0.30.2", features = ["rand"] }
-boilerplate = { version = "1.0.1", features = ["axum"] }
 brotli = "3.4.0"
 chrono = { version = "0.4.40", features = ["serde"] }
 ciborium = "0.2.2"
-clap = { version = "4.5.31", features = ["derive"] }
+clap = { version = "4.5.32", features = ["derive"] }
 ctrlc = { version = "3.4.5", features = ["termination"] }
 derive_more = { version = "2.0.1", features = ["full"] }
 dirs = "6.0.0"
-env_logger = "0.11.6"
+env_logger = "0.11.7"
 futures = "0.3.31"
 hex = "0.4.3"
-html-escaper = "0.2.0"
-http = "0.2.6"
-humantime = "2.1.0"
-hyper = { version = "0.14.24", features = ["client", "http2"] }
+http = "1.3.1"
+hyper = { version = "0.14.24", features = ["client", "http2", "tcp"] }
 indicatif = "0.17.11"
 lazy_static = "1.5.0"
-log = "0.4.26"
-mime = "0.3.17"
-mime_guess = "2.0.5"
+log = "0.4.27"
 miniscript = "10.2.0"
 mp4 = "0.14.0"
 redb = "2.4.0"
@@ -49,23 +41,13 @@ regex = "1.11.1"
 ring = "=0.17.12"
 rss = "2.0.12"
 rust-embed = "8.6.0"
-rustls = "0.22.4"
-rustls-acme = { version = "0.8.1", features = ["axum"] }
-serde = { version = "1.0.218", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["preserve_order"] }
 serde_yaml = "0.9.33"
 sha3 = "0.10.8"
-sysinfo = "0.30.3"
-tempfile = "3.18.0"
-tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
-tokio-stream = "0.1.17"
-tokio-util = { version = "0.7.13", features = ["compat"] }
-tower-http = { version = "0.4.0", features = [
-  "compression-br",
-  "compression-gzip",
-  "cors",
-  "set-header",
-] }
+sysinfo = "0.33.1"
+tempfile = "3.19.1"
+tokio = { version = "1.44.1", features = ["rt-multi-thread"] }
 
 [dependencies.ord-bitcoincore-rpc]
 package = "ord-bitcoincore-rpc"
@@ -73,16 +55,10 @@ git = "https://github.com/alexgo-io/ord-bitcoincore-rpc.git"
 rev = "395cb9e1044b3696cefc0e3d96bd0187ed108e45"
 
 [dev-dependencies]
-criterion = "0.5.1"
 executable-path = "1.0.0"
 pretty_assertions = "1.2.1"
-reqwest = { version = "0.11.10", features = ["blocking", "brotli", "json"] }
+reqwest = { version = "0.12.15", features = ["blocking", "brotli", "json"] }
 test-bitcoincore-rpc = { path = "test-bitcoincore-rpc" }
-unindent = "0.2.1"
-
-[[bench]]
-name = "server"
-harness = false
 
 [[bin]]
 name = "ord"
@@ -95,9 +71,6 @@ path = "src/lib.rs"
 [[test]]
 name = "integration"
 path = "tests/lib.rs"
-
-[build-dependencies]
-pulldown-cmark = "0.13.0"
 
 [target.'cfg(not(any(target_os = "macos", target_os="windows", target_arch = "arm")))'.dependencies]
 tikv-jemallocator = "0.6.0"

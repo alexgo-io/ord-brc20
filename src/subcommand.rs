@@ -1,15 +1,12 @@
 use super::*;
 
-pub mod balances;
 pub mod decode;
 pub mod epochs;
 pub mod find;
 pub mod index;
 pub mod list;
 pub mod parse;
-mod preview;
 pub mod runes;
-pub(crate) mod server;
 pub mod subsidy;
 pub mod supply;
 pub mod teleburn;
@@ -20,8 +17,6 @@ use crate::index::get_tx_limits;
 
 #[derive(Debug, Parser)]
 pub(crate) enum Subcommand {
-  #[command(about = "List all rune balances")]
-  Balances,
   #[command(about = "Decode a transaction")]
   Decode(decode::Decode),
   #[command(about = "List the first satoshis of each reward epoch")]
@@ -34,12 +29,8 @@ pub(crate) enum Subcommand {
   List(list::List),
   #[command(about = "Parse a satoshi from ordinal notation")]
   Parse(parse::Parse),
-  #[command(about = "Run an explorer server populated with inscriptions")]
-  Preview(preview::Preview),
   #[command(about = "List all runes")]
   Runes,
-  #[command(about = "Run the explorer server")]
-  Server(server::Server),
   #[command(about = "Display information about a block's subsidy")]
   Subsidy(subsidy::Subsidy),
   #[command(about = "Display Bitcoin supply information")]
@@ -63,21 +54,13 @@ fn max_transfer_counts() -> SubcommandResult {
 impl Subcommand {
   pub(crate) fn run(self, options: Options) -> SubcommandResult {
     match self {
-      Self::Balances => balances::run(options),
       Self::Decode(decode) => decode.run(options),
       Self::Epochs => epochs::run(),
       Self::Find(find) => find.run(options),
       Self::Index(index) => index.run(options),
       Self::List(list) => list.run(options),
       Self::Parse(parse) => parse.run(),
-      Self::Preview(preview) => preview.run(),
       Self::Runes => runes::run(options),
-      Self::Server(server) => {
-        let index = Arc::new(Index::open(&options)?);
-        let handle = axum_server::Handle::new();
-        LISTENERS.lock().unwrap().push(handle.clone());
-        server.run(options, index, handle)
-      }
       Self::Subsidy(subsidy) => subsidy.run(),
       Self::Supply => supply::run(),
       Self::Teleburn(teleburn) => teleburn.run(),

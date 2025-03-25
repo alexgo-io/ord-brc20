@@ -70,6 +70,7 @@ impl Chain {
     bitcoin::blockdata::constants::genesis_block(self.network())
   }
 
+  #[allow(dead_code)]
   pub(crate) fn address_from_script(
     self,
     script: &Script,
