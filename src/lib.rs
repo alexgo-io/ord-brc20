@@ -20,7 +20,7 @@ use {
     deserialize_from_str::DeserializeFromStr,
     epoch::Epoch,
     height::Height,
-    index::{List, RuneEntry},
+    index::List,
     inscriptions::{teleburn, Charm, ParsedEnvelope},
     outgoing::Outgoing,
     representation::Representation,

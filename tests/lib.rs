@@ -8,7 +8,7 @@ use {
     Network, OutPoint, Txid,
   },
   executable_path::executable_path,
-  ord::{subcommand::runes::RuneInfo, InscriptionId, Rune, RuneId, SatPoint},
+  ord::{InscriptionId, Rune, SatPoint},
   pretty_assertions::assert_eq as pretty_assert_eq,
   regex::Regex,
   reqwest::{StatusCode, Url},
@@ -70,13 +70,6 @@ fn etch(rpc_server: &test_bitcoincore_rpc::Handle, rune: Rune) -> Etch {
   output
 }
 
-fn runes(rpc_server: &test_bitcoincore_rpc::Handle) -> BTreeMap<Rune, RuneInfo> {
-  CommandBuilder::new("--index-runes --regtest runes")
-    .rpc_server(rpc_server)
-    .run_and_deserialize_output::<ord::subcommand::runes::Output>()
-    .runes
-}
-
 fn inscribe(rpc_server: &test_bitcoincore_rpc::Handle) -> (InscriptionId, Txid) {
   rpc_server.mine_blocks(1);
 
@@ -99,12 +92,10 @@ mod test_server;
 mod core;
 mod decode;
 mod epochs;
-mod etch;
 mod find;
 mod index;
 mod list;
 mod parse;
-mod runes;
 mod server;
 mod subsidy;
 mod supply;

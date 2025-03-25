@@ -6,7 +6,6 @@ pub mod find;
 pub mod index;
 pub mod list;
 pub mod parse;
-pub mod runes;
 pub mod subsidy;
 pub mod supply;
 pub mod teleburn;
@@ -29,8 +28,6 @@ pub(crate) enum Subcommand {
   List(list::List),
   #[command(about = "Parse a satoshi from ordinal notation")]
   Parse(parse::Parse),
-  #[command(about = "List all runes")]
-  Runes,
   #[command(about = "Display information about a block's subsidy")]
   Subsidy(subsidy::Subsidy),
   #[command(about = "Display Bitcoin supply information")]
@@ -60,7 +57,6 @@ impl Subcommand {
       Self::Index(index) => index.run(options),
       Self::List(list) => list.run(options),
       Self::Parse(parse) => parse.run(),
-      Self::Runes => runes::run(options),
       Self::Subsidy(subsidy) => subsidy.run(),
       Self::Supply => supply::run(),
       Self::Teleburn(teleburn) => teleburn.run(),
