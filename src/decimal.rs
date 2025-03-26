@@ -7,6 +7,7 @@ pub(crate) struct Decimal {
 }
 
 impl Decimal {
+  #[cfg(test)]
   pub(crate) fn to_amount(self, divisibility: u8) -> Result<u128> {
     match divisibility.checked_sub(self.scale) {
       Some(difference) => Ok(

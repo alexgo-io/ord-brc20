@@ -1,8 +1,5 @@
 use {
-  self::{
-    inscription_updater::InscriptionUpdater, inscription_updater::TX_LIMITS,
-    rune_updater::RuneUpdater,
-  },
+  self::{inscription_updater::InscriptionUpdater, inscription_updater::TX_LIMITS},
   super::{fetcher::Fetcher, *},
   futures::future::try_join_all,
   std::sync::mpsc,
@@ -12,7 +9,6 @@ use {
 use std::fs::File;
 
 mod inscription_updater;
-mod rune_updater;
 
 pub fn get_tx_limits() -> HashMap<String, i16> {
   let mut tx_limits = HashMap::new();
@@ -513,53 +509,6 @@ impl<'index> Updater<'_> {
       &Statistic::UnboundInscriptions.key(),
       &inscription_updater.unbound_inscriptions,
     )?;
-
-    if index.index_runes && self.height >= self.index.options.first_rune_height() {
-      let mut outpoint_to_rune_balances = wtx.open_table(OUTPOINT_TO_RUNE_BALANCES)?;
-      let mut rune_id_to_rune_entry = wtx.open_table(RUNE_ID_TO_RUNE_ENTRY)?;
-      let mut rune_to_rune_id = wtx.open_table(RUNE_TO_RUNE_ID)?;
-      let mut sequence_number_to_rune_id = wtx.open_table(SEQUENCE_NUMBER_TO_RUNE_ID)?;
-      let mut transaction_id_to_rune = wtx.open_table(TRANSACTION_ID_TO_RUNE)?;
-
-      let runes = statistic_to_count
-        .get(&Statistic::Runes.into())?
-        .map(|x| x.value())
-        .unwrap_or(0);
-
-      let mut rune_updater = RuneUpdater {
-        height: self.height,
-        id_to_entry: &mut rune_id_to_rune_entry,
-        inscription_id_to_sequence_number: &mut inscription_id_to_sequence_number,
-        minimum: Rune::minimum_at_height(self.index.options.chain(), Height(self.height)),
-        outpoint_to_balances: &mut outpoint_to_rune_balances,
-        rune_to_id: &mut rune_to_rune_id,
-        runes,
-        sequence_number_to_rune_id: &mut sequence_number_to_rune_id,
-        statistic_to_count: &mut statistic_to_count,
-        timestamp: block.header.time,
-        transaction_id_to_rune: &mut transaction_id_to_rune,
-        updates: HashMap::new(),
-      };
-
-      for (i, (tx, txid)) in block.txdata.iter().enumerate() {
-        rune_updater.index_runes(i, tx, *txid)?;
-      }
-
-      for (rune_id, update) in rune_updater.updates {
-        let mut entry = RuneEntry::load(
-          rune_id_to_rune_entry
-            .get(&rune_id.store())?
-            .unwrap()
-            .value(),
-        );
-
-        entry.burned += update.burned;
-        entry.mints += update.mints;
-        entry.supply += update.supply;
-
-        rune_id_to_rune_entry.insert(&rune_id.store(), entry.store())?;
-      }
-    }
 
     height_to_block_header.insert(&self.height, &block.header.store())?;
 

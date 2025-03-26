@@ -2,19 +2,14 @@
 
 use {
   self::{command_builder::CommandBuilder, expected::Expected, test_server::TestServer},
-  bitcoin::{
-    address::{Address, NetworkUnchecked},
-    blockdata::constants::COIN_VALUE,
-    Network, OutPoint, Txid,
-  },
+  bitcoin::{blockdata::constants::COIN_VALUE, Network, OutPoint, Txid},
   executable_path::executable_path,
-  ord::{InscriptionId, Rune, SatPoint},
+  ord::{InscriptionId, SatPoint},
   pretty_assertions::assert_eq as pretty_assert_eq,
   regex::Regex,
   reqwest::{StatusCode, Url},
   serde::de::DeserializeOwned,
   std::{
-    collections::BTreeMap,
     fs,
     io::Write,
     net::TcpListener,
@@ -25,7 +20,6 @@ use {
     time::Duration,
   },
   tempfile::TempDir,
-  test_bitcoincore_rpc::Sent,
 };
 
 macro_rules! assert_regex_match {
@@ -42,32 +36,12 @@ macro_rules! assert_regex_match {
   };
 }
 
-const RUNE: u128 = 99246114928149462;
-
 type Inscribe = ord::subcommand::wallet::inscribe::Output;
-type Etch = ord::subcommand::wallet::etch::Output;
 
 fn create_wallet(rpc_server: &test_bitcoincore_rpc::Handle) {
   CommandBuilder::new(format!("--chain {} wallet create", rpc_server.network()))
     .rpc_server(rpc_server)
     .run_and_deserialize_output::<ord::subcommand::wallet::create::Output>();
-}
-
-fn etch(rpc_server: &test_bitcoincore_rpc::Handle, rune: Rune) -> Etch {
-  rpc_server.mine_blocks(1);
-
-  let output = CommandBuilder::new(
-    format!(
-    "--index-runes --regtest wallet etch --rune {} --divisibility 0 --fee-rate 0 --supply 1000 --symbol ¢",
-    rune
-    )
-  )
-  .rpc_server(rpc_server)
-  .run_and_deserialize_output();
-
-  rpc_server.mine_blocks(1);
-
-  output
 }
 
 fn inscribe(rpc_server: &test_bitcoincore_rpc::Handle) -> (InscriptionId, Txid) {

@@ -4,10 +4,6 @@ use {super::*, std::collections::BTreeSet};
 pub struct Output {
   pub cardinal: u64,
   pub ordinal: u64,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub runes: Option<BTreeMap<Rune, u128>>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub runic: Option<u64>,
   pub total: u64,
 }
 
@@ -27,8 +23,6 @@ pub(crate) fn run(wallet: String, options: Options) -> SubcommandResult {
 
   let mut cardinal = 0;
   let mut ordinal = 0;
-  let mut runes = BTreeMap::new();
-  let mut runic = 0;
 
   for (outpoint, amount) in unspent_outputs {
     let rune_balances = index.get_rune_balances_for_outpoint(outpoint)?;
@@ -36,10 +30,6 @@ pub(crate) fn run(wallet: String, options: Options) -> SubcommandResult {
     if inscription_outputs.contains(&outpoint) {
       ordinal += amount.to_sat();
     } else if !rune_balances.is_empty() {
-      for (spaced_rune, pile) in rune_balances {
-        *runes.entry(spaced_rune.rune).or_default() += pile.amount;
-      }
-      runic += amount.to_sat();
     } else {
       cardinal += amount.to_sat();
     }
@@ -48,9 +38,7 @@ pub(crate) fn run(wallet: String, options: Options) -> SubcommandResult {
   Ok(Box::new(Output {
     cardinal,
     ordinal,
-    runes: index.has_rune_index().then_some(runes),
-    runic: index.has_rune_index().then_some(runic),
-    total: cardinal + ordinal + runic,
+    total: cardinal + ordinal,
   }))
 }
 
@@ -64,8 +52,6 @@ mod tests {
       serde_json::to_string(&Output {
         cardinal: 0,
         ordinal: 0,
-        runes: None,
-        runic: None,
         total: 0
       })
       .unwrap(),

@@ -19,9 +19,8 @@ use {
     epoch::Epoch,
     height::Height,
     inscriptions::{Charm, ParsedEnvelope},
-    outgoing::Outgoing,
     representation::Representation,
-    runes::{Etching, Pile, SpacedRune},
+    runes::{Pile, SpacedRune},
     subcommand::{Subcommand, SubcommandResult},
   },
   anyhow::{anyhow, bail, ensure, Context, Error},
@@ -137,41 +136,6 @@ static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 static INDEXER: Mutex<Option<thread::JoinHandle<()>>> = Mutex::new(Option::None);
 
 const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn fund_raw_transaction(
-  client: &Client,
-  fee_rate: FeeRate,
-  unfunded_transaction: &Transaction,
-) -> Result<Vec<u8>> {
-  let mut buffer = Vec::new();
-
-  {
-    unfunded_transaction.version.consensus_encode(&mut buffer)?;
-    unfunded_transaction.input.consensus_encode(&mut buffer)?;
-    unfunded_transaction.output.consensus_encode(&mut buffer)?;
-    unfunded_transaction
-      .lock_time
-      .consensus_encode(&mut buffer)?;
-  }
-
-  Ok(
-    client
-      .fund_raw_transaction(
-        &buffer,
-        Some(&bitcoincore_rpc::json::FundRawTransactionOptions {
-          // NB. This is `fundrawtransaction`'s `feeRate`, which is fee per kvB
-          // and *not* fee per vB. So, we multiply the fee rate given by the user
-          // by 1000.
-          fee_rate: Some(Amount::from_sat((fee_rate.n() * 1000.0).ceil() as u64)),
-          change_position: Some(unfunded_transaction.output.len().try_into()?),
-          ..Default::default()
-        }),
-        Some(false),
-      )?
-      .hex,
-  )
-}
 
 fn integration_test() -> bool {
   env::var_os("ORD_INTEGRATION_TEST")

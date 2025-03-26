@@ -17,13 +17,11 @@ use {
 pub mod balance;
 pub mod cardinals;
 pub mod create;
-pub mod etch;
 pub mod inscribe;
 pub mod inscriptions;
 pub mod outputs;
 pub mod receive;
 mod restore;
-pub mod send;
 pub mod transaction_builder;
 pub mod transactions;
 
@@ -41,8 +39,6 @@ pub(crate) enum Subcommand {
   Balance,
   #[command(about = "Create new wallet")]
   Create(create::Create),
-  #[command(about = "Create rune")]
-  Etch(etch::Etch),
   #[command(about = "Create inscription")]
   Inscribe(inscribe::Inscribe),
   #[command(about = "List wallet inscriptions")]
@@ -51,8 +47,6 @@ pub(crate) enum Subcommand {
   Receive,
   #[command(about = "Restore wallet")]
   Restore(restore::Restore),
-  #[command(about = "Send sat or inscription")]
-  Send(send::Send),
   #[command(about = "See wallet transactions")]
   Transactions(transactions::Transactions),
   #[command(about = "List all unspent outputs in wallet")]
@@ -66,12 +60,10 @@ impl Wallet {
     match self.subcommand {
       Subcommand::Balance => balance::run(self.name, options),
       Subcommand::Create(create) => create.run(self.name, options),
-      Subcommand::Etch(etch) => etch.run(self.name, options),
       Subcommand::Inscribe(inscribe) => inscribe.run(self.name, options),
       Subcommand::Inscriptions => inscriptions::run(self.name, options),
       Subcommand::Receive => receive::run(self.name, options),
       Subcommand::Restore(restore) => restore.run(self.name, options),
-      Subcommand::Send(send) => send.run(self.name, options),
       Subcommand::Transactions(transactions) => transactions.run(self.name, options),
       Subcommand::Outputs => outputs::run(self.name, options),
       Subcommand::Cardinals => cardinals::run(self.name, options),

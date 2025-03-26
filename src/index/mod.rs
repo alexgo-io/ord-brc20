@@ -146,7 +146,6 @@ pub struct Index {
   genesis_block_coinbase_transaction: Transaction,
   genesis_block_coinbase_txid: Txid,
   height_limit: Option<u32>,
-  index_runes: bool,
   index_transactions: bool,
   options: Options,
   unrecoverably_reorged: AtomicBool,
@@ -185,7 +184,6 @@ impl Index {
       redb::Durability::Immediate
     };
 
-    let index_runes;
     let index_transactions;
 
     let index_path = path.clone();
@@ -240,7 +238,6 @@ impl Index {
           }
 
 
-          index_runes = Self::is_statistic_set(&statistics, Statistic::IndexRunes)?;
           index_transactions = Self::is_statistic_set(&statistics, Statistic::IndexTransactions)?;
         }
 
@@ -280,10 +277,8 @@ impl Index {
         {
           let mut statistics = tx.open_table(STATISTIC_TO_COUNT)?;
 
-          index_runes = options.index_runes();
           index_transactions = options.index_transactions;
 
-          Self::set_statistic(&mut statistics, Statistic::IndexRunes, u64::from(index_runes))?;
           Self::set_statistic(&mut statistics, Statistic::IndexTransactions, u64::from(index_transactions))?;
           Self::set_statistic(&mut statistics, Statistic::Schema, SCHEMA_VERSION)?;
         }
@@ -298,10 +293,6 @@ impl Index {
     let genesis_block_coinbase_transaction =
       options.chain().genesis_block().coinbase().unwrap().clone();
 
-    println!(
-      "Open index: runes: {}, transactions: {}",
-      index_runes, index_transactions
-    );
     Ok(Self {
       genesis_block_coinbase_txid: genesis_block_coinbase_transaction.txid(),
       client,
@@ -310,7 +301,6 @@ impl Index {
       first_inscription_height: options.first_inscription_height(),
       genesis_block_coinbase_transaction,
       height_limit: options.height_limit,
-      index_runes,
       index_transactions,
       options: options.clone(),
       unrecoverably_reorged: AtomicBool::new(false),
@@ -334,10 +324,6 @@ impl Index {
     }
 
     Ok(true)
-  }
-
-  pub(crate) fn has_rune_index(&self) -> bool {
-    self.index_runes
   }
 
   pub(crate) fn update(&self) -> Result {
@@ -448,54 +434,6 @@ impl Index {
         .get(&sat.n())?
         .map(|satpoint| Entry::load(*satpoint.value())),
     )
-  }
-
-  pub(crate) fn rune(&self, rune: Rune) -> Result<Option<(RuneId, RuneEntry)>> {
-    let rtx = self.database.begin_read()?;
-
-    let Some(id) = rtx
-      .open_table(RUNE_TO_RUNE_ID)?
-      .get(rune.0)?
-      .map(|guard| guard.value())
-    else {
-      return Ok(None);
-    };
-
-    let entry = RuneEntry::load(
-      rtx
-        .open_table(RUNE_ID_TO_RUNE_ENTRY)?
-        .get(id)?
-        .unwrap()
-        .value(),
-    );
-
-    Ok(Some((RuneId::load(id), entry)))
-  }
-
-  pub(crate) fn get_rune_balance(&self, outpoint: OutPoint, id: RuneId) -> Result<u128> {
-    let rtx = self.database.begin_read()?;
-
-    let outpoint_to_balances = rtx.open_table(OUTPOINT_TO_RUNE_BALANCES)?;
-
-    let Some(balances) = outpoint_to_balances.get(&outpoint.store())? else {
-      return Ok(0);
-    };
-
-    let balances_buffer = balances.value();
-
-    let mut i = 0;
-    while i < balances_buffer.len() {
-      let (balance_id, length) = runes::varint::decode(&balances_buffer[i..]);
-      i += length;
-      let (amount, length) = runes::varint::decode(&balances_buffer[i..]);
-      i += length;
-
-      if RuneId::try_from(balance_id).unwrap() == id {
-        return Ok(amount);
-      }
-    }
-
-    Ok(0)
   }
 
   pub(crate) fn get_rune_balances_for_outpoint(
