@@ -3,11 +3,8 @@ use super::*;
 pub mod decode;
 pub mod epochs;
 pub mod index;
-pub mod parse;
 pub mod subsidy;
 pub mod supply;
-pub mod teleburn;
-pub mod traits;
 pub mod wallet;
 
 use crate::index::get_tx_limits;
@@ -20,16 +17,10 @@ pub(crate) enum Subcommand {
   Epochs,
   #[command(subcommand, about = "Index commands")]
   Index(index::IndexSubcommand),
-  #[command(about = "Parse a satoshi from ordinal notation")]
-  Parse(parse::Parse),
   #[command(about = "Display information about a block's subsidy")]
   Subsidy(subsidy::Subsidy),
   #[command(about = "Display Bitcoin supply information")]
   Supply,
-  #[command(about = "Generate teleburn addresses")]
-  Teleburn(teleburn::Teleburn),
-  #[command(about = "Display satoshi traits")]
-  Traits(traits::Traits),
   #[command(about = "Wallet commands")]
   Wallet(wallet::Wallet),
   #[command(about = "List max transfer counts")]
@@ -48,11 +39,8 @@ impl Subcommand {
       Self::Decode(decode) => decode.run(options),
       Self::Epochs => epochs::run(),
       Self::Index(index) => index.run(options),
-      Self::Parse(parse) => parse.run(),
       Self::Subsidy(subsidy) => subsidy.run(),
       Self::Supply => supply::run(),
-      Self::Teleburn(teleburn) => teleburn.run(),
-      Self::Traits(traits) => traits.run(),
       Self::Wallet(wallet) => wallet.run(options),
       Self::MaxTransferCounts => max_transfer_counts(),
     }

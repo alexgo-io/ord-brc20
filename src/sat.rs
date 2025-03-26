@@ -1,5 +1,8 @@
 use super::*;
 
+#[cfg(test)]
+use crate::decimal_sat::DecimalSat;
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Display, Ord, PartialOrd, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct Sat(pub u64);
@@ -21,6 +24,7 @@ impl Sat {
       + u32::try_from(self.epoch_position() / self.epoch().subsidy()).unwrap()
   }
 
+  #[cfg(test)]
   pub(crate) fn cycle(self) -> u32 {
     Epoch::from(self).0 / CYCLE_EPOCHS
   }
@@ -39,6 +43,7 @@ impl Sat {
     self.into()
   }
 
+  #[cfg(test)]
   pub(crate) fn period(self) -> u32 {
     self.height().n() / DIFFCHANGE_INTERVAL
   }
@@ -51,10 +56,12 @@ impl Sat {
     self.0 - self.epoch().starting_sat().0
   }
 
+  #[cfg(test)]
   pub(crate) fn decimal(self) -> DecimalSat {
     self.into()
   }
 
+  #[cfg(test)]
   pub(crate) fn rarity(self) -> Rarity {
     self.into()
   }
