@@ -42,15 +42,6 @@ pub struct Options {
   pub(crate) height_limit: Option<u32>,
   #[arg(long, help = "Use index at <INDEX>.")]
   pub(crate) index: Option<PathBuf>,
-  #[arg(long, help = "Store transactions in index.")]
-  pub(crate) index_transactions: bool,
-  #[arg(
-    long,
-    short,
-    alias = "noindex_inscriptions",
-    help = "Do not index inscriptions."
-  )]
-  pub(crate) no_index_inscriptions: bool,
   #[arg(long, short, help = "Use regtest. Equivalent to `--chain regtest`.")]
   pub(crate) regtest: bool,
   #[arg(long, help = "Connect to Bitcoin Core RPC at <RPC_URL>.")]

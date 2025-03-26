@@ -39,7 +39,6 @@ enum Origin {
     cursed: bool,
     cursed_for_brc20: bool,
     fee: u64,
-    hidden: bool,
     parent: Option<InscriptionId>,
     pointer: Option<u64>,
     reinscription: bool,
@@ -56,24 +55,15 @@ pub(super) struct InscriptionUpdater<'a, 'tx> {
   pub(super) cursed_inscription_count: u64,
   pub(super) flotsam: Vec<Flotsam<'a>>,
   pub(super) height: u32,
-  pub(super) home_inscription_count: u64,
-  pub(super) home_inscriptions: &'a mut Table<'tx, u32, InscriptionIdValue>,
   pub(super) id_to_sequence_number: &'a mut Table<'tx, InscriptionIdValue, u32>,
-  pub(super) index_transactions: bool,
-  pub(super) inscription_number_to_sequence_number: &'a mut Table<'tx, i32, u32>,
   pub(super) id_to_txcnt: &'a mut Table<'tx, InscriptionIdValue, i64>,
   pub(super) lost_sats: u64,
   pub(super) next_sequence_number: u32,
   pub(super) outpoint_to_value: &'a mut Table<'tx, &'static OutPointValue, u64>,
   pub(super) reward: u64,
-  pub(super) transaction_buffer: Vec<u8>,
-  pub(super) transaction_id_to_transaction:
-    &'a mut Table<'tx, &'static TxidValue, &'static [u8]>,
   pub(super) satpoint_to_sequence_number:
     &'a mut MultimapTable<'tx, &'static SatPointValue, u32>,
-  pub(super) sequence_number_to_children: &'a mut MultimapTable<'tx, u32, u32>,
-  pub(super) sequence_number_to_entry: &'a mut Table<'tx, u32, InscriptionEntryValue>,
-  pub(super) sequence_number_to_satpoint: &'a mut Table<'tx, u32, &'static SatPointValue>,
+  pub(super) sequence_number_to_inscription_entry: &'a mut Table<'tx, u32, InscriptionEntryValue>,
   pub(super) timestamp: u32,
   pub(super) unbound_inscriptions: u64,
   pub(super) value_cache: &'a mut HashMap<OutPoint, u64>,
@@ -94,7 +84,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
     let total_output_value = tx.output.iter().map(|txout| txout.value).sum::<u64>();
 
     let envelopes = ParsedEnvelope::from_transaction(tx);
-    let inscriptions = !envelopes.is_empty();
     let mut envelopes = envelopes.into_iter().peekable();
 
     for (input_index, tx_in) in tx.input.iter().enumerate() {
@@ -107,7 +96,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
       // find existing inscriptions on input (transfers of inscriptions)
       for (old_satpoint, inscription_id) in Index::inscriptions_on_output(
         self.satpoint_to_sequence_number,
-        self.sequence_number_to_entry,
+        self.sequence_number_to_inscription_entry,
         tx_in.previous_output,
       )? {
         let offset = total_input_value + old_satpoint.offset;
@@ -184,7 +173,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
 
             let initial_inscription_is_cursed = InscriptionEntry::load(
               self
-                .sequence_number_to_entry
+                .sequence_number_to_inscription_entry
                 .get(initial_inscription_sequence_number)?
                 .unwrap()
                 .value(),
@@ -227,7 +216,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
 
             let initial_inscription_is_cursed = InscriptionEntry::load(
               self
-                .sequence_number_to_entry
+                .sequence_number_to_inscription_entry
                 .get(initial_inscription_sequence_number)?
                 .unwrap()
                 .value(),
@@ -262,7 +251,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
             cursed: curse.is_some(),
             cursed_for_brc20: cursed_for_brc20.is_some(),
             fee: 0,
-            hidden: inscription.payload.hidden(),
             parent: inscription.payload.parent(),
             pointer: inscription.payload.pointer(),
             unbound,
@@ -278,17 +266,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
         envelopes.next();
         id_counter += 1;
       }
-    }
-
-    if self.index_transactions && inscriptions {
-      tx.consensus_encode(&mut self.transaction_buffer)
-        .expect("in-memory writers don't error");
-
-      self
-        .transaction_id_to_transaction
-        .insert(&txid.store(), self.transaction_buffer.as_slice())?;
-
-      self.transaction_buffer.clear();
     }
 
     let potential_parents = floating_inscriptions
@@ -528,7 +505,7 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
             .unwrap()
             .value();
         // get is_json_or_text from id_to_entry
-        let entry = self.sequence_number_to_entry.get(&sequence_number)?;
+        let entry = self.sequence_number_to_inscription_entry.get(&sequence_number)?;
         let entry = entry
           .map(|entry| InscriptionEntry::load(entry.value()))
           .unwrap();
@@ -550,7 +527,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
         cursed,
         cursed_for_brc20,
         fee,
-        hidden,
         parent,
         pointer: _,
         reinscription,
@@ -571,10 +547,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
 
         let sequence_number = self.next_sequence_number;
         self.next_sequence_number += 1;
-
-        self
-          .inscription_number_to_sequence_number
-          .insert(inscription_number, sequence_number)?;
 
         let inscription = ParsedEnvelope::from_transaction(&tx)
             .get(flotsam.inscription_id.index as usize)
@@ -638,16 +610,13 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
               .get(&parent_id.store())?
               .unwrap()
               .value();
-            self
-              .sequence_number_to_children
-              .insert(parent_sequence_number, sequence_number)?;
 
             Some(parent_sequence_number)
           }
           None => None,
         };
 
-        self.sequence_number_to_entry.insert(
+        self.sequence_number_to_inscription_entry.insert(
           sequence_number,
           &InscriptionEntry {
             charms,
@@ -669,18 +638,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
         self
           .id_to_sequence_number
           .insert(&inscription_id.store(), sequence_number)?;
-
-        if !hidden {
-          self
-            .home_inscriptions
-            .insert(&sequence_number, inscription_id.store())?;
-
-          if self.home_inscription_count == 100 {
-            self.home_inscriptions.pop_first()?;
-          } else {
-            self.home_inscription_count += 1;
-          }
-        }
 
         if !unbound && is_json_or_text {
           self.write_to_file(format!("cmd;{0};insert;transfer;{1};;{new_satpoint};{send_to_coinbase};{2};{3}", 
@@ -707,9 +664,6 @@ impl<'a, 'tx> InscriptionUpdater<'a, 'tx> {
     self
       .satpoint_to_sequence_number
       .insert(&satpoint, sequence_number)?;
-    self
-      .sequence_number_to_satpoint
-      .insert(sequence_number, &satpoint)?;
 
     self.write_to_file("".to_string(), true)?;
 

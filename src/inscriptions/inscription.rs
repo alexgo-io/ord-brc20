@@ -71,22 +71,6 @@ impl Inscription {
     Some(InscriptionId { txid, index })
   }
 
-  pub(crate) fn media(&self) -> Media {
-    if self.body.is_none() {
-      return Media::Unknown;
-    }
-
-    let Some(content_type) = self.content_type() else {
-      return Media::Unknown;
-    };
-
-    content_type.parse().unwrap_or(Media::Unknown)
-  }
-
-  pub(crate) fn body(&self) -> Option<&[u8]> {
-    Some(self.body.as_ref()?)
-  }
-
   pub(crate) fn content_type(&self) -> Option<&str> {
     str::from_utf8(self.content_type.as_ref()?).ok()
   }
@@ -127,32 +111,6 @@ impl Inscription {
     ];
 
     Some(u64::from_le_bytes(pointer))
-  }
-
-  pub(crate) fn hidden(&self) -> bool {
-    use regex::bytes::Regex;
-
-    lazy_static! {
-      static ref CONTENT: Regex = Regex::new(r"^\s*/content/[[:xdigit:]]{64}i\d+\s*$").unwrap();
-    }
-
-    if self
-      .body()
-      .map(|body| CONTENT.is_match(body))
-      .unwrap_or_default()
-    {
-      return true;
-    }
-
-    if self.metaprotocol.is_some() {
-      return true;
-    }
-
-    if let Media::Code(_) | Media::Text | Media::Unknown = self.media() {
-      return true;
-    }
-
-    false
   }
 }
 
@@ -402,69 +360,5 @@ mod tests {
       .pointer(),
       None,
     );
-  }
-
-  #[test]
-  fn hidden() {
-    #[track_caller]
-    fn case(content_type: Option<&str>, body: Option<&str>, expected: bool) {
-      assert_eq!(
-        Inscription {
-          content_type: content_type.map(|content_type| content_type.as_bytes().into()),
-          body: body.map(|content_type| content_type.as_bytes().into()),
-          ..Default::default()
-        }
-        .hidden(),
-        expected
-      );
-    }
-
-    case(None, None, true);
-    case(Some("foo"), Some(""), true);
-    case(Some("text/plain"), None, true);
-    case(
-      Some("text/plain"),
-      Some("The fox jumped. The cow danced."),
-      true,
-    );
-    case(Some("text/plain;charset=utf-8"), Some("foo"), true);
-    case(Some("text/plain;charset=cn-big5"), Some("foo"), true);
-    case(Some("application/json"), Some("foo"), true);
-    case(
-      Some("text/markdown"),
-      Some("/content/09a8d837ec0bcaec668ecf405e696a16bee5990863659c224ff888fb6f8f45e7i0"),
-      true,
-    );
-    case(
-      Some("text/html"),
-      Some("/content/09a8d837ec0bcaec668ecf405e696a16bee5990863659c224ff888fb6f8f45e7i0"),
-      true,
-    );
-    case(Some("application/yaml"), Some(""), true);
-    case(
-      Some("text/html;charset=utf-8"),
-      Some("/content/09a8d837ec0bcaec668ecf405e696a16bee5990863659c224ff888fb6f8f45e7i0"),
-      true,
-    );
-    case(
-      Some("text/html"),
-      Some("  /content/09a8d837ec0bcaec668ecf405e696a16bee5990863659c224ff888fb6f8f45e7i0  \n"),
-      true,
-    );
-
-    assert!(Inscription {
-      content_type: Some("text/plain".as_bytes().into()),
-      body: Some(b"{\xc3\x28}".as_slice().into()),
-      ..Default::default()
-    }
-    .hidden());
-
-    assert!(Inscription {
-      content_type: Some("text/html".as_bytes().into()),
-      body: Some("hello".as_bytes().into()),
-      metaprotocol: Some(Vec::new()),
-      ..Default::default()
-    }
-    .hidden());
   }
 }

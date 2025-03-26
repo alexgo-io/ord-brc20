@@ -373,8 +373,7 @@ impl<'index> Updater<'_> {
 
     let mut outpoint_to_value = wtx.open_table(OUTPOINT_TO_VALUE)?;
 
-    let index_inscriptions =
-      self.height >= index.first_inscription_height && !index.options.no_index_inscriptions;
+    let index_inscriptions = self.height >= index.first_inscription_height;
 
     if index_inscriptions {
       // Send all missing input outpoints to be fetched right away
@@ -412,19 +411,13 @@ impl<'index> Updater<'_> {
 
     let mut height_to_block_header = wtx.open_table(HEIGHT_TO_BLOCK_HEADER)?;
     let mut height_to_last_sequence_number = wtx.open_table(HEIGHT_TO_LAST_SEQUENCE_NUMBER)?;
-    let mut home_inscriptions = wtx.open_table(HOME_INSCRIPTIONS)?;
     let mut inscription_id_to_sequence_number =
       wtx.open_table(INSCRIPTION_ID_TO_SEQUENCE_NUMBER)?;
-    let mut inscription_number_to_sequence_number =
-      wtx.open_table(INSCRIPTION_NUMBER_TO_SEQUENCE_NUMBER)?;
     let mut inscription_id_to_txcnt = wtx.open_table(INSCRIPTION_ID_TO_TXCNT)?;
     let mut satpoint_to_sequence_number = wtx.open_multimap_table(SATPOINT_TO_SEQUENCE_NUMBER)?;
-    let mut sequence_number_to_children = wtx.open_multimap_table(SEQUENCE_NUMBER_TO_CHILDREN)?;
     let mut sequence_number_to_inscription_entry =
       wtx.open_table(SEQUENCE_NUMBER_TO_INSCRIPTION_ENTRY)?;
-    let mut sequence_number_to_satpoint = wtx.open_table(SEQUENCE_NUMBER_TO_SATPOINT)?;
     let mut statistic_to_count = wtx.open_table(STATISTIC_TO_COUNT)?;
-    let mut transaction_id_to_transaction = wtx.open_table(TRANSACTION_ID_TO_TRANSACTION)?;
 
     let lost_sats = statistic_to_count
       .get(&Statistic::LostSats.key())?
@@ -453,31 +446,21 @@ impl<'index> Updater<'_> {
       .map(|(number, _id)| number.value() + 1)
       .unwrap_or(0);
 
-    let home_inscription_count = home_inscriptions.len()?;
-
     let mut inscription_updater = InscriptionUpdater {
       blessed_inscription_count,
       chain: self.index.options.chain(),
       cursed_inscription_count,
       flotsam: Vec::new(),
       height: self.height,
-      home_inscription_count,
-      home_inscriptions: &mut home_inscriptions,
       id_to_sequence_number: &mut inscription_id_to_sequence_number,
-      index_transactions: self.index.index_transactions,
-      inscription_number_to_sequence_number: &mut inscription_number_to_sequence_number,
       id_to_txcnt: &mut inscription_id_to_txcnt,
       lost_sats,
       next_sequence_number,
       outpoint_to_value: &mut outpoint_to_value,
       reward: Height(self.height).subsidy(),
       satpoint_to_sequence_number: &mut satpoint_to_sequence_number,
-      sequence_number_to_children: &mut sequence_number_to_children,
-      sequence_number_to_entry: &mut sequence_number_to_inscription_entry,
-      sequence_number_to_satpoint: &mut sequence_number_to_satpoint,
+      sequence_number_to_inscription_entry: &mut sequence_number_to_inscription_entry,
       timestamp: block.header.time,
-      transaction_buffer: Vec::new(),
-      transaction_id_to_transaction: &mut transaction_id_to_transaction,
       unbound_inscriptions,
       value_cache,
       value_receiver,

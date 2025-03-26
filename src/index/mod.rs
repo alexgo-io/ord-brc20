@@ -2,7 +2,7 @@ use {
   self::{
     entry::{
       Entry, HeaderValue, InscriptionEntry, InscriptionEntryValue, InscriptionIdValue,
-      OutPointValue, RuneEntryValue, RuneIdValue, SatPointValue, TxidValue,
+      OutPointValue, SatPointValue,
     },
     reorg::*,
     updater::Updater,
@@ -14,9 +14,8 @@ use {
   log::log_enabled,
   ord_bitcoincore_rpc as bitcoincore_rpc,
   redb::{
-    Database, DatabaseError, MultimapTable, MultimapTableDefinition, ReadOnlyTable,
-    ReadableMultimapTable, ReadableTable, ReadableTableMetadata, RepairSession, StorageError,
-    Table, TableDefinition, WriteTransaction,
+    Database, DatabaseError, MultimapTable, MultimapTableDefinition, ReadableMultimapTable,
+    ReadableTable, RepairSession, StorageError, Table, TableDefinition, WriteTransaction,
   },
   std::{
     collections::HashMap,
@@ -51,24 +50,13 @@ macro_rules! define_multimap_table {
 
 define_multimap_table! { SATPOINT_TO_SEQUENCE_NUMBER, &SatPointValue, u32 }
 define_multimap_table! { SAT_TO_SEQUENCE_NUMBER, u64, u32 }
-define_multimap_table! { SEQUENCE_NUMBER_TO_CHILDREN, u32, u32 }
 define_table! { HEIGHT_TO_BLOCK_HEADER, u32, &HeaderValue }
 define_table! { HEIGHT_TO_LAST_SEQUENCE_NUMBER, u32, u32 }
-define_table! { HOME_INSCRIPTIONS, u32, InscriptionIdValue }
 define_table! { INSCRIPTION_ID_TO_SEQUENCE_NUMBER, InscriptionIdValue, u32 }
-define_table! { INSCRIPTION_NUMBER_TO_SEQUENCE_NUMBER, i32, u32 }
 define_table! { INSCRIPTION_ID_TO_TXCNT, InscriptionIdValue, i64 }
-define_table! { OUTPOINT_TO_RUNE_BALANCES, &OutPointValue, &[u8] }
 define_table! { OUTPOINT_TO_VALUE, &OutPointValue, u64}
-define_table! { RUNE_ID_TO_RUNE_ENTRY, RuneIdValue, RuneEntryValue }
-define_table! { RUNE_TO_RUNE_ID, u128, RuneIdValue }
-define_table! { SAT_TO_SATPOINT, u64, &SatPointValue }
 define_table! { SEQUENCE_NUMBER_TO_INSCRIPTION_ENTRY, u32, InscriptionEntryValue }
-define_table! { SEQUENCE_NUMBER_TO_RUNE_ID, u32, RuneIdValue }
-define_table! { SEQUENCE_NUMBER_TO_SATPOINT, u32, &SatPointValue }
 define_table! { STATISTIC_TO_COUNT, u64, u64 }
-define_table! { TRANSACTION_ID_TO_RUNE, &TxidValue, u128 }
-define_table! { TRANSACTION_ID_TO_TRANSACTION, &TxidValue, &[u8] }
 define_table! { WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP, u32, u128 }
 
 #[derive(Copy, Clone)]
@@ -130,7 +118,6 @@ pub struct Index {
   durability: redb::Durability,
   first_inscription_height: u32,
   height_limit: Option<u32>,
-  index_transactions: bool,
   options: Options,
   unrecoverably_reorged: AtomicBool,
 }
@@ -167,8 +154,6 @@ impl Index {
     } else {
       redb::Durability::Immediate
     };
-
-    let index_transactions;
 
     let index_path = path.clone();
     let once = Once::new();
@@ -220,9 +205,6 @@ impl Index {
             cmp::Ordering::Equal => {
             }
           }
-
-
-          index_transactions = Self::is_statistic_set(&statistics, Statistic::IndexTransactions)?;
         }
 
         database
@@ -240,30 +222,16 @@ impl Index {
 
         tx.open_multimap_table(SATPOINT_TO_SEQUENCE_NUMBER)?;
         tx.open_multimap_table(SAT_TO_SEQUENCE_NUMBER)?;
-        tx.open_multimap_table(SEQUENCE_NUMBER_TO_CHILDREN)?;
         tx.open_table(HEIGHT_TO_BLOCK_HEADER)?;
         tx.open_table(HEIGHT_TO_LAST_SEQUENCE_NUMBER)?;
-        tx.open_table(HOME_INSCRIPTIONS)?;
         tx.open_table(INSCRIPTION_ID_TO_SEQUENCE_NUMBER)?;
-        tx.open_table(INSCRIPTION_NUMBER_TO_SEQUENCE_NUMBER)?;
         tx.open_table(INSCRIPTION_ID_TO_TXCNT)?;
-        tx.open_table(OUTPOINT_TO_RUNE_BALANCES)?;
         tx.open_table(OUTPOINT_TO_VALUE)?;
-        tx.open_table(RUNE_ID_TO_RUNE_ENTRY)?;
-        tx.open_table(RUNE_TO_RUNE_ID)?;
-        tx.open_table(SAT_TO_SATPOINT)?;
         tx.open_table(SEQUENCE_NUMBER_TO_INSCRIPTION_ENTRY)?;
-        tx.open_table(SEQUENCE_NUMBER_TO_RUNE_ID)?;
-        tx.open_table(SEQUENCE_NUMBER_TO_SATPOINT)?;
-        tx.open_table(TRANSACTION_ID_TO_RUNE)?;
         tx.open_table(WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP)?;
 
         {
           let mut statistics = tx.open_table(STATISTIC_TO_COUNT)?;
-
-          index_transactions = options.index_transactions;
-
-          Self::set_statistic(&mut statistics, Statistic::IndexTransactions, u64::from(index_transactions))?;
           Self::set_statistic(&mut statistics, Statistic::Schema, SCHEMA_VERSION)?;
         }
 
@@ -280,7 +248,6 @@ impl Index {
       durability,
       first_inscription_height: options.first_inscription_height(),
       height_limit: options.height_limit,
-      index_transactions,
       options: options.clone(),
       unrecoverably_reorged: AtomicBool::new(false),
     })
@@ -342,19 +309,6 @@ impl Index {
   ) -> Result<()> {
     statistics.insert(&statistic.key(), &value)?;
     Ok(())
-  }
-
-  pub(crate) fn is_statistic_set(
-    statistics: &ReadOnlyTable<u64, u64>,
-    statistic: Statistic,
-  ) -> Result<bool> {
-    Ok(
-      statistics
-        .get(&statistic.key())?
-        .map(|guard| guard.value())
-        .unwrap_or_default()
-        != 0,
-    )
   }
 
   pub(crate) fn block_count(&self) -> Result<u32> {
