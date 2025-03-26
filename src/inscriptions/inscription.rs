@@ -1,18 +1,4 @@
-use {
-  super::*,
-  anyhow::ensure,
-  bitcoin::{
-    blockdata::{
-      opcodes,
-      script::{self, PushBytesBuf},
-    },
-    ScriptBuf,
-  },
-  brotli::enc::{writer::CompressorWriter, BrotliEncoderParams},
-  http::header::HeaderValue,
-  io::{Read, Write},
-  std::str,
-};
+use {super::*, http::header::HeaderValue, std::str};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Eq, Default)]
 pub struct Inscription {
@@ -39,76 +25,7 @@ impl Inscription {
     }
   }
 
-  pub(crate) fn from_file(
-    chain: Chain,
-    path: impl AsRef<Path>,
-    parent: Option<InscriptionId>,
-    pointer: Option<u64>,
-    metaprotocol: Option<String>,
-    metadata: Option<Vec<u8>>,
-    compress: bool,
-  ) -> Result<Self, Error> {
-    let path = path.as_ref();
-
-    let body = fs::read(path).with_context(|| format!("io error reading {}", path.display()))?;
-
-    let (content_type, compression_mode) = Media::content_type_for_path(path)?;
-
-    let (body, content_encoding) = if compress {
-      let mut compressed = Vec::new();
-
-      {
-        CompressorWriter::with_params(
-          &mut compressed,
-          body.len(),
-          &BrotliEncoderParams {
-            lgblock: 24,
-            lgwin: 24,
-            mode: compression_mode,
-            quality: 11,
-            size_hint: body.len(),
-            ..Default::default()
-          },
-        )
-        .write_all(&body)?;
-
-        let mut decompressor = brotli::Decompressor::new(compressed.as_slice(), compressed.len());
-
-        let mut decompressed = Vec::new();
-
-        decompressor.read_to_end(&mut decompressed)?;
-
-        ensure!(decompressed == body, "decompression roundtrip failed");
-      }
-
-      if compressed.len() < body.len() {
-        (compressed, Some("br".as_bytes().to_vec()))
-      } else {
-        (body, None)
-      }
-    } else {
-      (body, None)
-    };
-
-    if let Some(limit) = chain.inscription_content_size_limit() {
-      let len = body.len();
-      if len > limit {
-        bail!("content size of {len} bytes exceeds {limit} byte limit for {chain} inscriptions");
-      }
-    }
-
-    Ok(Self {
-      body: Some(body),
-      content_type: Some(content_type.into()),
-      content_encoding,
-      metadata,
-      metaprotocol: metaprotocol.map(|metaprotocol| metaprotocol.into_bytes()),
-      parent: parent.map(|id| id.value()),
-      pointer: pointer.map(Self::pointer_value),
-      ..Default::default()
-    })
-  }
-
+  #[cfg(test)]
   pub(crate) fn pointer_value(pointer: u64) -> Vec<u8> {
     let mut bytes = pointer.to_le_bytes().to_vec();
 
@@ -117,56 +34,6 @@ impl Inscription {
     }
 
     bytes
-  }
-
-  pub(crate) fn append_reveal_script_to_builder(
-    &self,
-    mut builder: script::Builder,
-  ) -> script::Builder {
-    builder = builder
-      .push_opcode(opcodes::OP_FALSE)
-      .push_opcode(opcodes::all::OP_IF)
-      .push_slice(envelope::PROTOCOL_ID);
-
-    Tag::ContentType.encode(&mut builder, &self.content_type);
-    Tag::ContentEncoding.encode(&mut builder, &self.content_encoding);
-    Tag::Metaprotocol.encode(&mut builder, &self.metaprotocol);
-    Tag::Parent.encode(&mut builder, &self.parent);
-    Tag::Delegate.encode(&mut builder, &self.delegate);
-    Tag::Pointer.encode(&mut builder, &self.pointer);
-    Tag::Metadata.encode(&mut builder, &self.metadata);
-
-    if let Some(body) = &self.body {
-      builder = builder.push_slice(envelope::BODY_TAG);
-      for chunk in body.chunks(MAX_SCRIPT_ELEMENT_SIZE) {
-        builder = builder.push_slice(PushBytesBuf::try_from(chunk.to_vec()).unwrap());
-      }
-    }
-
-    builder.push_opcode(opcodes::all::OP_ENDIF)
-  }
-
-  #[cfg(test)]
-  pub(crate) fn append_reveal_script(&self, builder: script::Builder) -> ScriptBuf {
-    self.append_reveal_script_to_builder(builder).into_script()
-  }
-
-  pub(crate) fn append_batch_reveal_script_to_builder(
-    inscriptions: &[Inscription],
-    mut builder: script::Builder,
-  ) -> script::Builder {
-    for inscription in inscriptions {
-      builder = inscription.append_reveal_script_to_builder(builder);
-    }
-
-    builder
-  }
-
-  pub(crate) fn append_batch_reveal_script(
-    inscriptions: &[Inscription],
-    builder: script::Builder,
-  ) -> ScriptBuf {
-    Inscription::append_batch_reveal_script_to_builder(inscriptions, builder).into_script()
   }
 
   fn inscription_id_field(field: &Option<Vec<u8>>) -> Option<InscriptionId> {
@@ -233,11 +100,6 @@ impl Inscription {
     Self::inscription_id_field(&self.delegate)
   }
 
-  #[cfg(test)]
-  pub(crate) fn metadata(&self) -> Option<Value> {
-    ciborium::from_reader(Cursor::new(self.metadata.as_ref()?)).ok()
-  }
-
   pub(crate) fn metaprotocol(&self) -> Option<&str> {
     str::from_utf8(self.metaprotocol.as_ref()?).ok()
   }
@@ -265,20 +127,6 @@ impl Inscription {
     ];
 
     Some(u64::from_le_bytes(pointer))
-  }
-
-  #[cfg(test)]
-  pub(crate) fn to_witness(&self) -> Witness {
-    let builder = script::Builder::new();
-
-    let script = self.append_reveal_script(builder);
-
-    let mut witness = Witness::new();
-
-    witness.push(script);
-    witness.push([]);
-
-    witness
   }
 
   pub(crate) fn hidden(&self) -> bool {
@@ -310,116 +158,7 @@ impl Inscription {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, std::io::Write};
-
-  #[test]
-  fn reveal_script_chunks_body() {
-    assert_eq!(
-      inscription("foo", [])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      7
-    );
-
-    assert_eq!(
-      inscription("foo", [0; 1])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      8
-    );
-
-    assert_eq!(
-      inscription("foo", [0; 520])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      8
-    );
-
-    assert_eq!(
-      inscription("foo", [0; 521])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      9
-    );
-
-    assert_eq!(
-      inscription("foo", [0; 1040])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      9
-    );
-
-    assert_eq!(
-      inscription("foo", [0; 1041])
-        .append_reveal_script(script::Builder::new())
-        .instructions()
-        .count(),
-      10
-    );
-  }
-
-  #[test]
-  fn reveal_script_chunks_metadata() {
-    assert_eq!(
-      Inscription {
-        metadata: None,
-        ..Default::default()
-      }
-      .append_reveal_script(script::Builder::new())
-      .instructions()
-      .count(),
-      4
-    );
-
-    assert_eq!(
-      Inscription {
-        metadata: Some(Vec::new()),
-        ..Default::default()
-      }
-      .append_reveal_script(script::Builder::new())
-      .instructions()
-      .count(),
-      4
-    );
-
-    assert_eq!(
-      Inscription {
-        metadata: Some(vec![0; 1]),
-        ..Default::default()
-      }
-      .append_reveal_script(script::Builder::new())
-      .instructions()
-      .count(),
-      6
-    );
-
-    assert_eq!(
-      Inscription {
-        metadata: Some(vec![0; 520]),
-        ..Default::default()
-      }
-      .append_reveal_script(script::Builder::new())
-      .instructions()
-      .count(),
-      6
-    );
-
-    assert_eq!(
-      Inscription {
-        metadata: Some(vec![0; 521]),
-        ..Default::default()
-      }
-      .append_reveal_script(script::Builder::new())
-      .instructions()
-      .count(),
-      8
-    );
-  }
+  use super::*;
 
   #[test]
   fn inscription_with_no_parent_field_has_no_parent() {
@@ -606,43 +345,6 @@ mod tests {
   }
 
   #[test]
-  fn metadata_function_decodes_metadata() {
-    assert_eq!(
-      Inscription {
-        metadata: Some(vec![0x44, 0, 1, 2, 3]),
-        ..Default::default()
-      }
-      .metadata()
-      .unwrap(),
-      Value::Bytes(vec![0, 1, 2, 3]),
-    );
-  }
-
-  #[test]
-  fn metadata_function_returns_none_if_no_metadata() {
-    assert_eq!(
-      Inscription {
-        metadata: None,
-        ..Default::default()
-      }
-      .metadata(),
-      None,
-    );
-  }
-
-  #[test]
-  fn metadata_function_returns_none_if_metadata_fails_to_parse() {
-    assert_eq!(
-      Inscription {
-        metadata: Some(vec![0x44]),
-        ..Default::default()
-      }
-      .metadata(),
-      None,
-    );
-  }
-
-  #[test]
   fn pointer_decode() {
     assert_eq!(
       Inscription {
@@ -700,78 +402,6 @@ mod tests {
       .pointer(),
       None,
     );
-  }
-
-  #[test]
-  fn pointer_encode() {
-    assert_eq!(
-      Inscription {
-        pointer: None,
-        ..Default::default()
-      }
-      .to_witness(),
-      envelope(&[b"ord"]),
-    );
-
-    assert_eq!(
-      Inscription {
-        pointer: Some(vec![1, 2, 3]),
-        ..Default::default()
-      }
-      .to_witness(),
-      envelope(&[b"ord", &[2], &[1, 2, 3]]),
-    );
-  }
-
-  #[test]
-  fn pointer_value() {
-    let mut file = tempfile::Builder::new().suffix(".txt").tempfile().unwrap();
-
-    write!(file, "foo").unwrap();
-
-    let inscription =
-      Inscription::from_file(Chain::Mainnet, file.path(), None, None, None, None, false).unwrap();
-
-    assert_eq!(inscription.pointer, None);
-
-    let inscription = Inscription::from_file(
-      Chain::Mainnet,
-      file.path(),
-      None,
-      Some(0),
-      None,
-      None,
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(inscription.pointer, Some(Vec::new()));
-
-    let inscription = Inscription::from_file(
-      Chain::Mainnet,
-      file.path(),
-      None,
-      Some(1),
-      None,
-      None,
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(inscription.pointer, Some(vec![1]));
-
-    let inscription = Inscription::from_file(
-      Chain::Mainnet,
-      file.path(),
-      None,
-      Some(256),
-      None,
-      None,
-      false,
-    )
-    .unwrap();
-
-    assert_eq!(inscription.pointer, Some(vec![0, 1]));
   }
 
   #[test]

@@ -91,34 +91,6 @@ fn from_stdin() {
 }
 
 #[test]
-fn from_core() {
-  let rpc_server = test_bitcoincore_rpc::spawn();
-  create_wallet(&rpc_server);
-  rpc_server.mine_blocks(1);
-
-  let (_inscription, reveal) = inscribe(&rpc_server);
-
-  assert_eq!(
-    CommandBuilder::new(format!("decode --txid {reveal}"))
-      .rpc_server(&rpc_server)
-      .run_and_deserialize_output::<RawOutput>(),
-    RawOutput {
-      inscriptions: vec![Envelope {
-        payload: Inscription {
-          body: Some(b"FOO".into()),
-          content_type: Some(b"text/plain;charset=utf-8".into()),
-          ..Default::default()
-        },
-        input: 0,
-        offset: 0,
-        pushnum: false,
-        stutter: false,
-      }],
-    },
-  );
-}
-
-#[test]
 fn compact() {
   assert_eq!(
     CommandBuilder::new("decode --compact --file transaction.bin")

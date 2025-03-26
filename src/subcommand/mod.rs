@@ -5,7 +5,6 @@ pub mod epochs;
 pub mod index;
 pub mod subsidy;
 pub mod supply;
-pub mod wallet;
 
 use crate::index::get_tx_limits;
 
@@ -21,8 +20,6 @@ pub(crate) enum Subcommand {
   Subsidy(subsidy::Subsidy),
   #[command(about = "Display Bitcoin supply information")]
   Supply,
-  #[command(about = "Wallet commands")]
-  Wallet(wallet::Wallet),
   #[command(about = "List max transfer counts")]
   MaxTransferCounts,
 }
@@ -41,7 +38,6 @@ impl Subcommand {
       Self::Index(index) => index.run(options),
       Self::Subsidy(subsidy) => subsidy.run(),
       Self::Supply => supply::run(),
-      Self::Wallet(wallet) => wallet.run(options),
       Self::MaxTransferCounts => max_transfer_counts(),
     }
   }

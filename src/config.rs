@@ -30,7 +30,7 @@ mod tests {
       .unwrap();
 
     let config = Config {
-      hidden: iter::once(a).collect(),
+      hidden: std::iter::once(a).collect(),
       ..Default::default()
     };
 

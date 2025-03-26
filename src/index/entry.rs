@@ -63,15 +63,6 @@ pub(super) type RuneEntryValue = (
   u32,          // timestamp
 );
 
-impl RuneEntry {
-  pub(crate) fn spaced_rune(&self) -> SpacedRune {
-    SpacedRune {
-      rune: self.rune,
-      spacers: self.spacers,
-    }
-  }
-}
-
 impl Default for RuneEntry {
   fn default() -> Self {
     Self {

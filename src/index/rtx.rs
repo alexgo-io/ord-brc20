@@ -3,19 +3,6 @@ use super::*;
 pub(crate) struct Rtx(pub(crate) redb::ReadTransaction);
 
 impl Rtx {
-  #[cfg(test)]
-  pub(crate) fn block_height(&self) -> Result<Option<Height>> {
-    Ok(
-      self
-        .0
-        .open_table(HEIGHT_TO_BLOCK_HEADER)?
-        .range(0..)?
-        .next_back()
-        .and_then(|result| result.ok())
-        .map(|(height, _header)| Height(height.value())),
-    )
-  }
-
   pub(crate) fn block_count(&self) -> Result<u32> {
     Ok(
       self

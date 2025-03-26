@@ -84,22 +84,11 @@ impl CommandBuilder {
     }
   }
 
-  pub(crate) fn stderr_regex(self, expected_stderr: impl AsRef<str>) -> Self {
-    Self {
-      expected_stderr: Expected::regex(expected_stderr.as_ref()),
-      ..self
-    }
-  }
-
   pub(crate) fn expected_exit_code(self, expected_exit_code: i32) -> Self {
     Self {
       expected_exit_code,
       ..self
     }
-  }
-
-  pub(crate) fn temp_dir(self, tempdir: TempDir) -> Self {
-    Self { tempdir, ..self }
   }
 
   pub(crate) fn command(&self) -> Command {
@@ -158,11 +147,6 @@ impl CommandBuilder {
     self.expected_stdout.assert_match(stdout);
 
     (self.tempdir, stdout.into())
-  }
-
-  pub(crate) fn run_and_extract_file(self, path: impl AsRef<Path>) -> String {
-    let tempdir = self.run().0;
-    fs::read_to_string(tempdir.path().join(path)).unwrap()
   }
 
   #[track_caller]

@@ -20,30 +20,22 @@ use {
     height::Height,
     inscriptions::{Charm, ParsedEnvelope},
     representation::Representation,
-    runes::{Pile, SpacedRune},
+    runes::SpacedRune,
     subcommand::{Subcommand, SubcommandResult},
   },
   anyhow::{anyhow, bail, ensure, Context, Error},
-  bip39::Mnemonic,
   bitcoin::{
     address::{Address, NetworkUnchecked},
-    blockdata::{
-      constants::{
-        COIN_VALUE, DIFFCHANGE_INTERVAL, MAX_SCRIPT_ELEMENT_SIZE, SUBSIDY_HALVING_INTERVAL,
-      },
-      locktime::absolute::LockTime,
-    },
+    blockdata::constants::{COIN_VALUE, DIFFCHANGE_INTERVAL, SUBSIDY_HALVING_INTERVAL},
     consensus::{self, Decodable, Encodable},
     hash_types::BlockHash,
     hashes::Hash,
     script::{self},
-    Amount, Block, Network, OutPoint, Script, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
-    Witness,
+    Amount, Block, Network, OutPoint, Script, ScriptBuf, Transaction, Txid,
   },
   bitcoincore_rpc::{Client, RpcApi},
   chain::Chain,
   chrono::{DateTime, TimeZone, Utc},
-  ciborium::Value,
   clap::{ArgGroup, Parser},
   derive_more::{Display, FromStr},
   lazy_static::lazy_static,
@@ -52,12 +44,11 @@ use {
   serde::{Deserialize, Deserializer, Serialize, Serializer},
   std::{
     cmp,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     env,
     fmt::{self, Display, Formatter},
     fs::{self, File},
     io::{self, Cursor},
-    mem,
     ops::{Add, AddAssign, Sub},
     path::{Path, PathBuf},
     process::{self},
@@ -81,12 +72,7 @@ pub use self::{
   runes::{Edict, Rune, RuneId, Runestone},
   sat::Sat,
   sat_point::SatPoint,
-  subcommand::wallet::transaction_builder::{Target, TransactionBuilder},
 };
-
-#[cfg(test)]
-#[allow(unused_imports)]
-use self::index::List;
 
 #[cfg(test)]
 #[macro_use]
@@ -94,16 +80,6 @@ mod test;
 
 #[cfg(test)]
 use self::test::*;
-
-macro_rules! tprintln {
-    ($($arg:tt)*) => {
-
-      if cfg!(test) {
-        eprint!("==> ");
-        eprintln!($($arg)*);
-      }
-    };
-}
 
 mod arguments;
 mod chain;
@@ -134,8 +110,6 @@ const CYCLE_EPOCHS: u32 = 6;
 
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 static INDEXER: Mutex<Option<thread::JoinHandle<()>>> = Mutex::new(Option::None);
-
-const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
 
 fn integration_test() -> bool {
   env::var_os("ORD_INTEGRATION_TEST")

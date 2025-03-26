@@ -36,27 +36,6 @@ impl Tag {
     }
   }
 
-  pub(crate) fn encode(self, builder: &mut script::Builder, value: &Option<Vec<u8>>) {
-    if let Some(value) = value {
-      let mut tmp = script::Builder::new();
-      mem::swap(&mut tmp, builder);
-
-      if self.is_chunked() {
-        for chunk in value.chunks(MAX_SCRIPT_ELEMENT_SIZE) {
-          tmp = tmp
-            .push_slice::<&script::PushBytes>(self.bytes().try_into().unwrap())
-            .push_slice::<&script::PushBytes>(chunk.try_into().unwrap());
-        }
-      } else {
-        tmp = tmp
-          .push_slice::<&script::PushBytes>(self.bytes().try_into().unwrap())
-          .push_slice::<&script::PushBytes>(value.as_slice().try_into().unwrap());
-      }
-
-      mem::swap(&mut tmp, builder);
-    }
-  }
-
   pub(crate) fn remove_field(self, fields: &mut BTreeMap<&[u8], Vec<&[u8]>>) -> Option<Vec<u8>> {
     if self.is_chunked() {
       let value = fields.remove(self.bytes())?;

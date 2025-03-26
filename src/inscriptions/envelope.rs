@@ -12,7 +12,6 @@ use {
 };
 
 pub(crate) const PROTOCOL_ID: [u8; 3] = *b"ord";
-pub(crate) const BODY_TAG: [u8; 0] = [];
 
 type Result<T> = std::result::Result<T, script::Error>;
 type RawEnvelope = Envelope<Vec<Vec<u8>>>;
@@ -256,6 +255,8 @@ impl RawEnvelope {
 
 #[cfg(test)]
 mod tests {
+  use bitcoin::{absolute::LockTime, Sequence, TxIn};
+
   use super::*;
 
   fn parse(witnesses: &[Witness]) -> Vec<ParsedEnvelope> {
@@ -679,43 +680,6 @@ mod tests {
   }
 
   #[test]
-  fn extract_from_second_input() {
-    assert_eq!(
-      parse(&[Witness::new(), inscription("foo", [1; 1040]).to_witness()]),
-      vec![ParsedEnvelope {
-        payload: inscription("foo", [1; 1040]),
-        input: 1,
-        ..Default::default()
-      }]
-    );
-  }
-
-  #[test]
-  fn extract_from_second_envelope() {
-    let mut builder = script::Builder::new();
-    builder = inscription("foo", [1; 100]).append_reveal_script_to_builder(builder);
-    builder = inscription("bar", [1; 100]).append_reveal_script_to_builder(builder);
-
-    assert_eq!(
-      parse(&[Witness::from_slice(&[
-        builder.into_script().into_bytes(),
-        Vec::new()
-      ])]),
-      vec![
-        ParsedEnvelope {
-          payload: inscription("foo", [1; 100]),
-          ..Default::default()
-        },
-        ParsedEnvelope {
-          payload: inscription("bar", [1; 100]),
-          offset: 1,
-          ..Default::default()
-        }
-      ]
-    );
-  }
-
-  #[test]
   fn inscribe_png() {
     assert_eq!(
       parse(&[envelope(&[
@@ -729,40 +693,6 @@ mod tests {
         payload: inscription("image/png", [1; 100]),
         ..Default::default()
       }]
-    );
-  }
-
-  #[test]
-  fn chunked_data_is_parsable() {
-    let mut witness = Witness::new();
-
-    witness.push(&inscription("foo", [1; 1040]).append_reveal_script(script::Builder::new()));
-
-    witness.push([]);
-
-    assert_eq!(
-      parse(&[witness]),
-      vec![ParsedEnvelope {
-        payload: inscription("foo", [1; 1040]),
-        ..Default::default()
-      }]
-    );
-  }
-
-  #[test]
-  fn round_trip_with_no_fields() {
-    let mut witness = Witness::new();
-
-    witness.push(Inscription::default().append_reveal_script(script::Builder::new()));
-
-    witness.push([]);
-
-    assert_eq!(
-      parse(&[witness]),
-      vec![ParsedEnvelope {
-        payload: Inscription::default(),
-        ..Default::default()
-      }],
     );
   }
 

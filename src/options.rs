@@ -232,7 +232,12 @@ impl Options {
 
 #[cfg(test)]
 mod tests {
-  use {super::*, bitcoin::Network, std::path::Path, tempfile::TempDir};
+  use {
+    super::*,
+    bitcoin::Network,
+    std::{iter, path::Path},
+    tempfile::TempDir,
+  };
 
   #[test]
   fn rpc_url_overrides_network() {
@@ -548,25 +553,6 @@ mod tests {
     );
   }
 
-  fn parse_wallet_args(args: &str) -> (Options, subcommand::wallet::Wallet) {
-    match Arguments::try_parse_from(args.split_whitespace()) {
-      Ok(arguments) => match arguments.subcommand {
-        Subcommand::Wallet(wallet) => (arguments.options, wallet),
-        subcommand => panic!("unexpected subcommand: {subcommand:?}"),
-      },
-      Err(err) => panic!("error parsing arguments: {err}"),
-    }
-  }
-
-  #[test]
-  fn wallet_flag_overrides_default_name() {
-    let (_, wallet) = parse_wallet_args("ord wallet create");
-    assert_eq!(wallet.name, "ord");
-
-    let (_, wallet) = parse_wallet_args("ord wallet --name foo create");
-    assert_eq!(wallet.name, "foo")
-  }
-
   #[test]
   fn default_config_is_returned_if_config_option_is_not_passed() {
     assert_eq!(
@@ -576,16 +562,6 @@ mod tests {
         .load_config()
         .unwrap(),
       Default::default()
-    );
-  }
-
-  #[test]
-  fn uses_wallet_rpc() {
-    let (options, _) = parse_wallet_args("ord wallet --name foo balance");
-
-    assert_eq!(
-      options.rpc_url(Some("foo".into())),
-      "127.0.0.1:8332/wallet/foo"
     );
   }
 
